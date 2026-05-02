@@ -20,6 +20,173 @@ Both skills maintain a **codebase knowledge graph** (DuckDB + Tree-sitter + opti
 
 ---
 
+## Diagram 1 — How this repo gets used (lifecycle)
+
+```mermaid
+flowchart LR
+    A[bolts-package repo<br/>spec only] -->|Step 1<br/>install.sh| B[target project<br/>.claude/]
+    B -->|Step 2<br/>git commit| C[target project<br/>committed spec]
+    C -->|Step 3<br/>paste kickoff prompt| D[Claude Code<br/>reads spec]
+    D -->|writes read-back| E[human acks<br/>read-back]
+    E -->|answers 9 open Qs| F[M0 → M5-pilot+1<br/>~6-8 weeks]
+    F -->|writes code into| G[target project<br/>.claude/skills/make-bolt/<br/>.claude/skills/run-bolt/]
+    G -->|now usable| H[/make-bolt &amp; /run-bolt<br/>fully functional/]
+
+    style A fill:#e8f0ff,stroke:#3060a0
+    style G fill:#e8ffe8,stroke:#308030
+    style H fill:#e8ffe8,stroke:#308030,stroke-width:2px
+```
+
+---
+
+## Capability matrix (one-glance overview)
+
+| Capability | `/make-bolt` | `/run-bolt` |
+|---|:---:|:---:|
+| Accepts free text, PDFs, screenshots, URLs, YAML | ✓ | — |
+| Researches domain via internal KB + web | ✓ | (via sub-agents) |
+| Decomposes requirements into HQC-compliant tickets | ✓ | — |
+| Validates DAG (no cycles, no scope-overlap) | ✓ | ✓ |
+| Diff-gated writes (no Linear/ADO write before human approval) | ✓ | — |
+| Writes to ticket tool (ADO / Jira / GitHub / markdown stub) | ✓ | (state updates only) |
+| CREATE mode (new epic) | ✓ | — |
+| MODIFY mode (augment existing, Backlog only) | ✓ | — |
+| REVERIFY mode (read-only audit) | ✓ | — |
+| Picks DAG-ready tickets in waves of 4-8 | — | ✓ |
+| Spawns Claude sub-agents in isolated git worktrees | — | ✓ |
+| Runs unit + integration + E2E + a11y + mutation + security gates | — | ✓ |
+| 3 mandatory AI reviewers (code + security + HIPAA) on every PR | — | ✓ |
+| Opens PRs in Azure Repos, polls Azure Pipelines, auto-merges | — | ✓ |
+| Reopens tickets on regression / KB-break / supersession | — | ✓ |
+| Brown-field adoption (P0.5) — retroactive grading of Done tickets | — | ✓ |
+| Circuit breaker (3 consecutive quality-gate failures → pause) | — | ✓ |
+| Halt-Quality Contract enforcement (every halt validated) | ✓ | ✓ |
+| Codebase knowledge graph (DuckDB + Tree-sitter + Roslyn fusion) | reads | reads + writes |
+| App-type detection (HIPAA / PCI / FERPA / FDA-SaMD / AI / PII) | (one-time at M0) | (verified each run) |
+| Self-improvement (L0 auto-apply, L1+ PR proposals) | (drift signals checked) | (drift signals checked) |
+| Audit trail to orphan git branch (`bolt/audit/<epic>`) | — | ✓ |
+| Mock-mode + shadow-mode for first-run hardening | — | ✓ |
+
+---
+
+## Diagram 2 — `/make-bolt` six-phase pipeline
+
+```mermaid
+flowchart TD
+    Start([User invokes<br/>/make-bolt &lt;requirements&gt;]) --> Mode{Mode<br/>detection}
+
+    Mode -->|first arg matches EP-...<br/>+ --reverify| RV[REVERIFY<br/>read-only audit]
+    Mode -->|first arg matches EP-...| Mod[MODIFY<br/>augment existing epic]
+    Mode -->|otherwise| Cre[CREATE<br/>new epic]
+
+    RV --> RVOut[/markdown report<br/>plans/...-reverify.md/]
+    RVOut --> RVDone([exit])
+
+    Cre --> P1
+    Mod --> P1
+
+    P1[P1 INGEST<br/>parse text, PDFs, screenshots,<br/>URLs, YAML → unified.md] --> P2
+    P2[P2 RESEARCH<br/>sub-agent reads KB + web<br/>→ research-brief.md] --> P3
+    P3[P3 DECOMPOSE<br/>sub-agent emits ticket-candidates.json<br/>with ACs, scope, DoD, dependencies] --> P4
+    P4{P4 VALIDATE<br/>HQC + DAG + REG-1..6 +<br/>migration-serial + measurable-AC}
+
+    P4 -->|blocking failure| Halt([halt with<br/>specific halt-code])
+    P4 -->|all pass| P5
+
+    P5[P5 DIFF<br/>generate human-readable diff<br/>plans/...-diff.md] --> Approve{Human types<br/>'approve'?}
+
+    Approve -->|cancel| Cancel([abort])
+    Approve -->|approve| P6
+
+    P6[P6 WRITE<br/>idempotent ticket creation via<br/>label-keyed search; never modifies<br/>In-Progress or Done tickets] --> Out[/Tickets in ticket tool<br/>+ scaffolding files committed/]
+    Out --> Done([epic ready for /run-bolt])
+
+    style P5 fill:#fff8e0,stroke:#a06000
+    style Approve fill:#fff8e0,stroke:#a06000,stroke-width:2px
+    style Halt fill:#ffe0e0,stroke:#a03030
+    style Cancel fill:#ffe0e0,stroke:#a03030
+    style Done fill:#e8ffe8,stroke:#308030,stroke-width:2px
+```
+
+---
+
+## Diagram 3 — `/run-bolt` orchestration (phases + wave loop + reopen engine)
+
+```mermaid
+flowchart TD
+    Start([User invokes<br/>/run-bolt &lt;epic-key&gt;]) --> Pn1
+
+    Pn1[P-1 MCP-BOOTSTRAP<br/>verify context7, mcp_memory,<br/>filesystem, ADO, Jira MCPs] --> Pn0
+    Pn0[P0 CONFIG-VALIDATE<br/>load + schema-check<br/>bolt.config.yaml] --> Pat
+    Pat[P0 APP-TYPE-DETECT<br/>classify repo<br/>→ HIPAA / PCI / FERPA / etc.] --> Pkg
+    Pkg[P0.25 KG-INIT<br/>Tree-sitter + Roslyn fusion<br/>→ DuckDB graph + calibrated confidence] --> Pei
+    Pei[P0.5 EPIC-INIT<br/>build graph, gap detection,<br/>path-claims signoff] --> Pad
+    Pad{P0.75 ADOPT<br/>brown-field?}
+
+    Pad -->|green-field| Wave
+    Pad -->|brown-field| AdoptGrade[retroactive grading<br/>of Done tickets<br/>→ adoption-report.md]
+    AdoptGrade -->|user accepts| Wave
+
+    Wave[Wave loop start]
+    Wave --> P1[P1 WAVE-PLAN<br/>lease reclaim, DAG-ready,<br/>gate-first, partition by<br/>path-overlap + scope]
+    P1 --> P2[P2 FAN-OUT<br/>4-8 sub-agents in parallel<br/>each in isolation=worktree<br/>with frozen prompt template]
+
+    P2 --> Sub1[sub-agent 1<br/>preflight → research → TDD<br/>→ test → KB-sync → commit]
+    P2 --> Sub2[sub-agent 2<br/>same 9-phase loop]
+    P2 --> SubN[... up to N]
+
+    Sub1 --> P3
+    Sub2 --> P3
+    SubN --> P3
+
+    P3[P3 MERGE-WAVE<br/>serial merge by priority + phase<br/>pre-push smoke, KB-sync workflows A/B/C/D,<br/>mutation gate, validators]
+    P3 --> AIRev[P3.5 AI REVIEW<br/>code-reviewer + security-reviewer +<br/>HIPAA-reviewer in parallel<br/>cross-family ensemble]
+
+    AIRev -->|any 'block' verdict| Halt([halt PR<br/>ai_reviewer_block])
+    AIRev -->|all approve| OpenPR[open PR in Azure Repos<br/>poll Azure Pipelines<br/>auto-merge --squash]
+
+    OpenPR --> PostMerge[post-merge:<br/>incremental regression check<br/>git_notes attribution write]
+    PostMerge --> Reopen{reopen<br/>candidates?}
+
+    Reopen -->|trigger a-e| ReopenAct[reopen ticket<br/>flip to In Progress<br/>insert next wave with priority boost]
+    Reopen -->|none| MoreWaves{DAG<br/>empty?}
+
+    ReopenAct --> MoreWaves
+
+    MoreWaves -->|no| Wave
+    MoreWaves -->|yes| P4
+
+    P4[P4 EPIC-CLOSE<br/>final regression, REG-1..6 execution,<br/>final reopen sweep, summary.md]
+    P4 --> P5si[P5 SELF-IMPROVE-CHECK<br/>every Nth run only<br/>fetch drift signals → L0 auto-apply<br/>or L1+ PR]
+    P5si --> Done([epic complete<br/>audit branch contains<br/>complete evidence chain])
+
+    Halt -.->|breaker counts| CB{Circuit breaker<br/>3 consecutive<br/>quality-gate fails?}
+    CB -->|yes| Pause([EPIC_PAUSED_<br/>CIRCUIT_BREAKER<br/>requires --confirm-paused])
+    CB -->|no| Wave
+
+    style Wave fill:#e8f0ff,stroke:#3060a0
+    style P3 fill:#fff8e0,stroke:#a06000
+    style AIRev fill:#fff8e0,stroke:#a06000,stroke-width:2px
+    style Reopen fill:#ffe8d0,stroke:#a05000
+    style Halt fill:#ffe0e0,stroke:#a03030
+    style Pause fill:#ffe0e0,stroke:#a03030
+    style Done fill:#e8ffe8,stroke:#308030,stroke-width:2px
+```
+
+### Reopen-engine triggers (5)
+
+| Trigger | Source | Detection |
+|---|---|---|
+| **(a) Regression-attribution** | post-merge incremental tests | new failure → `git blame` test + sources → rank by recency × scope-overlap → reopen if Done & confidence ≥ 0.6 |
+| **(b) KB-break** | KB validator failure | `json_path` → provenance → atom_id → `git blame` → ticket |
+| **(c) Mandatory test type** | policy effective_date passed | every Done ticket whose merged_at < effective_date AND missing required test type |
+| **(d) Supersession** | new ADR with `supersedes:` frontmatter | look up ticket via `kb_currency_deps` |
+| **(e) Standards-sweep** | manual `--reopen-only --trigger e` | full re-eval against current `policy.yaml` |
+
+Storm protection: `policy.max_reopens_per_run = 5`, `policy.max_reopens_per_ticket = 2`. Beyond budget → halt `reopen_budget_exceeded`.
+
+---
+
 ## Who this is for
 
 You are running Claude Code (Opus 4.7 with 1M context, recommended). You have a project that:
