@@ -62,6 +62,8 @@ flowchart LR
 | Circuit breaker (3 consecutive quality-gate failures → pause) | — | ✓ |
 | Halt-Quality Contract enforcement (every halt validated) | ✓ | ✓ |
 | **Standards-Coherence Bridge** — every ticket validated against run-bolt's full semantic standards (HIPAA AC-compliance, KG-aware scope, mutation-feasibility, mandatory-test-type policy, Dafny-invariant exposure, HIPAA reviewer pre-flight) | ✓ | ✓ |
+| **Per-ticket test-coverage promise** — every code-touching ticket gets unit + integration + E2E + a11y ACs derived structurally from `dod_category` + file census; missing → halt or auto-fix with templated AC | ✓ | ✓ |
+| **KG-driven dependency verification** — missing `blocked_by` edges detected by symbol-level analysis; wrong-direction edges flagged; concurrent-modification risk surfaced before partitioning | ✓ | ✓ |
 | Codebase knowledge graph (DuckDB + Tree-sitter + Roslyn fusion) | reads | reads + writes |
 | App-type detection (HIPAA / PCI / FERPA / FDA-SaMD / AI / PII) | (one-time at M0) | (verified each run) |
 | Self-improvement (L0 auto-apply, L1+ PR proposals) | (drift signals checked) | (drift signals checked) |
@@ -94,7 +96,7 @@ flowchart TD
     P4 -->|blocking failure| Halt([halt with<br/>specific halt-code])
     P4 -->|all pass| P45
 
-    P45{P4.5 STANDARDS-BRIDGE<br/>shared validator — same one run-bolt calls<br/>1. structural HQC re-run<br/>2. app-type AC compliance HIPAA/PCI/FDA<br/>3. KG-aware scope correctness ≥ 0.7 coverage<br/>4. mutation- and coverage-feasibility<br/>5. mandatory-test-type policy<br/>6. Dafny-invariant exposure<br/>7. reopen-c self-audit<br/>8. HIPAA-reviewer pre-flight HIPAA mode}
+    P45{P4.5 STANDARDS-BRIDGE<br/>shared validator — same one run-bolt calls<br/>1. structural HQC re-run<br/>2. app-type AC compliance HIPAA/PCI/FDA<br/>3. KG-aware scope correctness ≥ 0.7 coverage<br/>4. mutation- and coverage-feasibility<br/>5. mandatory-test-type policy<br/>6. Dafny-invariant exposure<br/>7. reopen-c self-audit<br/>8. HIPAA-reviewer pre-flight HIPAA mode<br/>9. per-ticket required test types unit/integ/E2E/a11y/migration/loader/PHI<br/>10. KG-driven dependency check missing edges + wrong direction + concurrent modification}
 
     P45 -->|blocking failure| HaltSB([halt with<br/>same halt-code run-bolt would raise<br/>e.g. ac_violates_app_type_standard])
     P45 -->|all pass| P5
@@ -116,7 +118,15 @@ flowchart TD
     style Done fill:#e8ffe8,stroke:#308030,stroke-width:2px
 ```
 
-> **Why P4.5 matters:** make-bolt and run-bolt share a single validator (`bolt_shared/standards_bridge.py`). Run-bolt calls the same function at P0.5 EPIC-INIT and on every sub-agent preflight. A ticket that passes P4.5 cannot fail run-bolt's structural / scope / app-type / policy / Dafny-invariant gates at runtime — those are pre-cleared. Master plan §29 is the spec.
+> **Why P4.5 matters:** make-bolt and run-bolt share a single validator (`bolt_shared/standards_bridge.py`). Run-bolt calls the same function at P0.5 EPIC-INIT and on every sub-agent preflight. A ticket that passes P4.5 cannot fail run-bolt's structural / scope / app-type / policy / Dafny-invariant gates at runtime — those are pre-cleared.
+>
+> Checks 1-8 are §29 (HIPAA AC-compliance, KG-aware scope, mutation-feasibility, etc.). Checks 9-10 are §30:
+>
+> - **Check 9 — required test types per ticket.** Derived structurally from `dod_category` + file-extension census, NOT from policy alone. Code-touching ticket without a unit-test AC → halt. UI ticket without an E2E AC → halt. UI ticket with E2E but no a11y AC → halt. Migration without a migration-test AC → halt. HIPAA-touching ticket without a PHI-redaction-test AC → halt. Auto-fix appends a templated AC for review at P5 DIFF.
+>
+> - **Check 10 — KG-driven dependency verification.** For every ticket pair (A,B): if A creates symbol S and B reads S but `A ∉ B.blocked_by` → `dependency_missing_strong` halt (auto-fix offered). If declared edge direction is reverse of KG-implied → `dependency_wrong_direction` halt. If A and B touch the same file with no edge between them → `concurrent_modification_risk` warning (auto-fix offers `wave_pin` or `blocked_by`).
+>
+> Master plan §29 + §30 are the specs.
 
 ---
 

@@ -1488,4 +1488,169 @@ Future-Claude **may not** mark M5 done without all of §25.4 + §27.5 PLUS:
 
 ---
 
+## 30. Per-Ticket Test Coverage + KG-Driven Dependency Verification
+
+### 30.1 The two gaps this section closes
+
+§29 closed the make-bolt → run-bolt drift on app-type compliance, scope, and policy gates. Two more drifts remained:
+
+**Gap A — Test-coverage promise per ticket.** Decompose only required "measurable ACs". A measurable AC like *"`POST /api/patients/{id}` returns 200 with serialized DTO"* is measurable but does not, by itself, force a **unit test**, an **integration test**, or an **E2E test** to be written. Run-bolt's coverage / mutation / E2E gates fire at P3 and discover the deficit too late.
+
+**Gap B — Semantic correctness of dependencies.** P4 verified the DAG is **acyclic**. It did not verify the DAG is **complete or correct**. Two failure modes ship today:
+- *Missing edge:* ticket B reads symbol `S` that ticket A creates, but B has no `blocked_by: [A]`. Wave partitioning ships them concurrently; merge order is wrong; B's tests fail at P3.
+- *Wrong direction:* ticket A says `blocked_by: [B]` but symbol-level reality is the reverse. Acyclic, still wrong.
+- *Concurrent modification:* tickets A and B both modify the same class, neither blocks the other, and they land in different waves. Second merge gets a real conflict at P3 `merge_conflict_judgment`.
+
+§30 adds two more checks to the standards bridge to close these.
+
+### 30.2 Test-coverage structural rule (per ticket)
+
+The bridge derives required test types **structurally from `dod_category` + file-extension census**, NOT from `policy.yaml` alone. Policy still tightens; the floor is structural.
+
+```python
+def required_test_types(ticket: TicketCandidate, kg: KnowledgeGraph) -> set[str]:
+    """
+    Returns the set of test types that MUST appear in this ticket's ACs
+    as measurable, runner-bound assertions.
+    """
+    types: set[str] = set()
+    file_census = census_by_extension(ticket.file_scope_claims, kg)
+
+    has_code = file_census.cs > 0 or file_census.ts > 0 or file_census.tsx > 0 or file_census.js > 0
+    has_backend_code = file_census.cs > 0
+    has_frontend_code = file_census.ts > 0 or file_census.tsx > 0 or file_census.razor > 0
+    has_controller_or_service = kg.any_symbol_in(ticket.file_scope_claims, kinds={"controller", "service", "endpoint"})
+    has_ui_component = kg.any_symbol_in(ticket.file_scope_claims, kinds={"angular_component", "react_component", "razor_view"})
+    has_migration = file_census.migration > 0  # EF migration files
+    has_data_loader = ticket.dod_category == "data_loader"
+
+    # Universal floor: any code touch → unit test required
+    if has_code:
+        types.add("unit")
+
+    # API / service work → integration test required
+    if has_backend_code and (has_controller_or_service or ticket.dod_category == "backend_api"):
+        types.add("integration")
+
+    # UI work → E2E + accessibility required
+    if has_frontend_code or has_ui_component:
+        types.add("e2e")
+        types.add("a11y")
+
+    # Migrations → migration test required (up + down + idempotency)
+    if has_migration or ticket.dod_category == "migration":
+        types.add("migration_test")
+
+    # Data loaders → data-loader test required (row count, schema, dedup, currency)
+    if has_data_loader:
+        types.add("data_loader_test")
+
+    # HIPAA mode + PHI scope → PHI redaction test required
+    if app_type == "hipaa" and ticket.hipaa_touch_predicted:
+        types.add("phi_redaction_test")
+
+    # docs / config-only / dod_category=docs → no tests required (handled by §29.3 check 4 mutation_required=False)
+    return types
+```
+
+For each `t` in `required_test_types(ticket)`, the bridge checks the AC list for a measurable AC that satisfies `t`. The match is regex-based with a published library:
+
+```yaml
+# .claude/skills/bolt_shared/required_ac_patterns.yaml
+unit:
+  required_keywords: ["xUnit", "NUnit", "Jest", "unit test", "[Fact]", "describe(", "it("]
+  example_ac: "xUnit test PatientServiceTests.GetById_ReturnsDto asserts service.GetById(42) returns PatientDto with FirstName='Ada'"
+integration:
+  required_keywords: ["integration test", "WebApplicationFactory", "TestServer", "supertest", "HTTP \\d{3}"]
+  example_ac: "Integration test POST /api/patients/{id} returns HTTP 200 with body matching PatientDto schema (verified via WebApplicationFactory)"
+e2e:
+  required_keywords: ["Playwright", "@playwright/test", "page.goto", "expect(page", "test.describe"]
+  example_ac: "Playwright test navigates to /patients/42, asserts patient header renders, screenshot diff <2% vs baseline"
+a11y:
+  required_keywords: ["axe-core", "axe.run", "@axe-core/playwright", "AxeBuilder", "0 critical violations"]
+  example_ac: "AxeBuilder.analyze() on /patients/42 returns 0 violations of impact 'critical' or 'serious'"
+migration_test:
+  required_keywords: ["migration test", "ef-migrations", "Up()", "Down()", "idempotent"]
+  example_ac: "ef-migrations integration test applies migration AddPatientConsent up + down without data loss; second up() is no-op"
+data_loader_test:
+  required_keywords: ["row count", "schema", "dedup", "currency", "loader test"]
+  example_ac: "loader test verifies row_count(patients) == 1247, schema matches v3, no duplicates on (mrn, dob), currency_age_hours < 24"
+phi_redaction_test:
+  required_keywords: ["PHI", "redact", "scrub", "audit-log not contains", "log assertion"]
+  example_ac: "Test asserts audit log for /api/patients/42/get does NOT contain SSN, MRN, DOB, or full name fields"
+```
+
+**Result of check.** Missing required test type for a ticket → blocking_failure `missing_required_test_ac` with the gap listed. The bridge offers an `auto_fix` that appends a templated AC pulled from `example_ac` for review at make-bolt P5 DIFF.
+
+**Override:** an ADR at `docs/adr/<date>-skip-test-<type>-<ticket-id>.md` justifies skipping a required test type. Auto-fix never overrides a docs-only or pure-config ticket (those are still exempt via `mutation_required=False` from §29.3 check 4).
+
+### 30.3 KG-driven dependency verification
+
+The bridge runs three new sub-checks at make-bolt P4.5 (and re-runs at run-bolt P0.5 EPIC-INIT):
+
+**Sub-check 30.3.1 — Missing dependency detection.**
+
+For each pair of candidate tickets `(A, B)` in the epic:
+
+1. Compute `symbols_created_by_A` = symbols whose definition would be added/modified by A (KG infers from `file_scope_claims` + AC keyword extraction).
+2. Compute `symbols_read_by_B` = symbols B's ACs reference (KG lookup) AND symbols in B's `file_scope_claims` that resolve to definitions outside B's own scope.
+3. If `symbols_created_by_A ∩ symbols_read_by_B ≠ ∅` and `A.identifier ∉ B.blocked_by`:
+   - Severity is determined by overlap size and KG calibrated_confidence:
+     - ≥3 symbols overlap with mean confidence ≥ 0.85 → **blocking_failure** `dependency_missing_strong`
+     - 1-2 symbols overlap or confidence 0.70-0.85 → **warning** `dependency_missing_weak`
+     - <0.70 confidence → **info** `dependency_missing_low_confidence`
+
+**Sub-check 30.3.2 — Wrong-direction detection.**
+
+For each declared edge `A → B` (B blocks A), check whether KG-implied direction is the reverse. If `symbols_created_by_B ∩ symbols_read_by_A ≠ ∅` AND `symbols_created_by_A ∩ symbols_read_by_B = ∅` → **blocking_failure** `dependency_wrong_direction` with both edges listed.
+
+**Sub-check 30.3.3 — Concurrent-modification risk.**
+
+For each pair `(A, B)` with no `blocked_by` edge in either direction:
+
+1. Compute `files_modified_by_A` and `files_modified_by_B` from `file_scope_claims`.
+2. If `files_modified_by_A ∩ files_modified_by_B ≠ ∅`:
+   - Same wave partition would catch it (run-bolt P1 path-overlap exclusion). Cross-wave is the risk.
+   - **warning** `concurrent_modification_risk` with the overlapping files.
+   - Auto-fix offer: add the smaller-priority ticket's `blocked_by` to point at the larger-priority one OR mark them with a shared `wave_pin: <wave-number>` so partitioning forces them into the same wave (where path-overlap exclusion handles it).
+
+### 30.4 Auto-fix vs blocking — the tradeoff
+
+The bridge's two new auto-fix categories:
+
+- **`append_missing_test_ac`** (from §30.2) — appends `example_ac` for the missing test type. Review at P5 DIFF; user can edit before approval.
+- **`append_missing_blocked_by`** (from §30.3.1, only for `dependency_missing_strong`) — proposes adding `A.identifier` to `B.blocked_by`. Review at P5 DIFF.
+
+Auto-fixes are applied unless the user passes `--no-autofix` to make-bolt. Blocking failures cannot be auto-fixed — they halt P4.5 and require user re-prompting of decompose with the gap surfaced.
+
+### 30.5 Cost model for the new checks
+
+Per epic with N tickets:
+- Test-coverage check: O(N) — pure regex + lookup, ≤ 50ms per ticket
+- Dependency check: O(N²) symbol intersections — 100 tickets × 100 tickets × ~10ms KG lookup = ~100s. Acceptable for an epic-creation-time check that runs once. Cached by `(ticket_canonical_hash_pair, kg_sha)`.
+- HIPAA-reviewer pre-flight: unchanged from §29.
+
+### 30.6 Sign-off update (replaces §29.7)
+
+Future-Claude **may not** mark M5 done without all of §25.4 + §27.5 + §29.7 PLUS:
+
+- §30.2 `required_test_types()` and `required_ac_patterns.yaml` shipped
+- §30.3 dependency-verification sub-checks 30.3.1 / 30.3.2 / 30.3.3 implemented
+- Integration test: a code-touching ticket without a unit-test AC halts at P4.5 with `missing_required_test_ac`, and `auto_fix` proposes the template AC
+- Integration test: a UI ticket without an E2E AC halts; with E2E but no a11y AC halts
+- Integration test: a migration ticket without a migration-test AC halts
+- Integration test: ticket B reads symbol S created by ticket A; without `blocked_by: [A]` halts with `dependency_missing_strong`
+- Integration test: ticket pair touching same file with no `blocked_by` between them surfaces `concurrent_modification_risk` warning
+- Integration test: docs-only ticket exempt from all required-test-type checks
+- Required-AC corpus seeded with all 7 required test types per the table in §30.2
+
+### 30.7 What this still does NOT promise
+
+- The bridge cannot guarantee the *quality* of the unit / E2E tests written by sub-agents at run-bolt P2 — only that the AC requires them. Test quality is policed by mutation score (§27.2 #5), property-based testing (§27.2 #4), and AI reviewers (§11).
+- KG-driven dependency detection inherits the §26 KG accuracy ceiling (~94-96%). Symbols KG missed produce false negatives (missing-dependency check passes when it shouldn't). Calibrated confidence at ≥ 0.85 keeps false positives low; false negatives are acknowledged.
+- Cross-language dependencies (TypeScript frontend calls .NET backend via REST) require the OpenAPI cross-language linker (§26.2 #6). Without it, FE→BE dependency edges go undetected.
+- Pure logical / business dependencies ("ticket B's UX requires the design from ticket A's mockup") are invisible to the KG. Decompose-time prose still has to capture those; the bridge cannot.
+
+---
+
 **End of master plan.**
