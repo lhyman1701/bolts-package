@@ -305,7 +305,7 @@ bolts-package/
 │       └── Stub MCP server registry — context7, mcp__memory__, filesystem, azure_devops, jira
 │
 ├── reference/
-│   └── SOURCE-SKILL-MECHANICS.md           ← abstracted patterns from the source skills
+│   └── BOLT-MECHANICS.md           ← abstracted patterns from make-bolt + run-bolt
 │       └── Phase order, halt-quality contract, idempotency, KB-sync, reopen engine,
 │           manifest schema, quality gates, auto-resolve ladders, circuit breaker.
 │           No verbatim source code; no project-specific identifiers.

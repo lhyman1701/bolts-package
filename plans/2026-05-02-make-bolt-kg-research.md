@@ -130,19 +130,19 @@ Strategy is taken almost verbatim from rust-analyzer's salsa, Codebase-Memory, a
 
 ## 5. KG maintenance during /run-bolt orchestration
 
-Mapping to the existing `/run-epic2` lifecycle (from `CLAUDE.md` coexistence matrix):
+Mapping to the existing `/run-bolt` lifecycle (from `CLAUDE.md` coexistence matrix):
 
 | Phase | KG action | Rationale |
 |---|---|---|
 | **P0 EPIC-INIT** | If `kg.duckdb` missing or `meta.last_indexed_sha` is stale by >50 commits or >7 days → **full rebuild**. Otherwise incremental from `meta.last_indexed_sha` to `HEAD`. | Bounded freshness without paying full-rebuild cost every run. |
-| **P0.5 ADOPT** (brown-field) | Always full rebuild on first adoption — provides clean baseline for grading historical Done tickets. | Mirrors run-epic2's existing ADOPT semantics. |
+| **P0.5 ADOPT** (brown-field) | Always full rebuild on first adoption — provides clean baseline for grading historical Done tickets. | Mirrors run-bolt's existing ADOPT semantics. |
 | **Per-ticket worktree** | Run `kg-bolt update --from-sha <merge-base>` *inside the worktree* writing to a worktree-local `kg.duckdb` (under `~/.run-bolt/scratch/<run-id>/<ANU>/`). Worktree KG is never written back. | Each ticket sees a private snapshot; no cross-ticket contamination. |
-| **After ticket merge to integration branch** | Single-writer mainline: `kg-bolt incremental <merged_sha>` writes to canonical `.bolt/kg/kg.duckdb`. Serial; takes a lock. | One source of truth; merge-serial matches run-epic2's merge model. |
+| **After ticket merge to integration branch** | Single-writer mainline: `kg-bolt incremental <merged_sha>` writes to canonical `.bolt/kg/kg.duckdb`. Serial; takes a lock. | One source of truth; merge-serial matches run-bolt's merge model. |
 | **Schema-change ticket** (migration files touched) | Force full rebuild after merge. | DB schema KG nodes are too entangled for safe incremental update. |
-| **Audit-branch model** | KG is an artifact, not source. Build product (DuckDB file) goes into `re2/audit/<epic>` orphan branch under `docs/run-epic2/<epic>/kg/`. Reproducible from source on any machine. | Don't pollute main with binary blobs; consumers can rebuild from `meta.commit_sha`. |
+| **Audit-branch model** | KG is an artifact, not source. Build product (DuckDB file) goes into `bolt/audit/<epic>` orphan branch under `docs/run-bolt/<epic>/kg/`. Reproducible from source on any machine. | Don't pollute main with binary blobs; consumers can rebuild from `meta.commit_sha`. |
 
 ### Locking
-Single mutex lockfile `.bolt/kg/.lock` for the canonical KG. Worktree-local KGs need no lock. Same lock-file pattern as run-epic2's epic lock.
+Single mutex lockfile `.bolt/kg/.lock` for the canonical KG. Worktree-local KGs need no lock. Same lock-file pattern as run-bolt's epic lock.
 
 ---
 
@@ -314,7 +314,7 @@ CREATE TABLE IF NOT EXISTS symbols (
     file_id        BIGINT NOT NULL REFERENCES files(file_id),
     kind           VARCHAR NOT NULL,             -- namespace|class|interface|record|struct|enum|method|function|property|field|constructor|component|hook|controller|endpoint|db_entity|...
     name           VARCHAR NOT NULL,
-    qualified_name VARCHAR NOT NULL,             -- e.g. the source project.Services.Auth.LoginHandler.Execute
+    qualified_name VARCHAR NOT NULL,             -- e.g. the project.Services.Auth.LoginHandler.Execute
     parent_symbol  VARCHAR,                      -- nullable; FK soft-ref to symbols.symbol_id
     visibility     VARCHAR,                      -- public|private|internal|protected
     is_static      BOOLEAN DEFAULT FALSE,
@@ -486,7 +486,7 @@ CREATE INDEX IF NOT EXISTS idx_kg_runs_to_sha ON kg_runs(to_sha);
 ```sql
 -- 1. Callers of a symbol (Gate G3 — blast radius)
 WITH RECURSIVE callers(sym, depth) AS (
-    SELECT 'csharp::the source project.Services.Auth.LoginHandler#Execute', 0
+    SELECT 'csharp::the project.Services.Auth.LoginHandler#Execute', 0
     UNION ALL
     SELECT e.src_symbol_id, c.depth + 1
     FROM edges e JOIN callers c ON e.dst_symbol_id = c.sym

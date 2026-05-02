@@ -1,15 +1,15 @@
-# Source-Skill Mechanics — Abstracted Reference
+# Bolt Mechanics — Abstracted Reference
 
-> The original verbatim source code of `make-epic2` and `run-epic2` is **not included** in this package by design. The verbatim code carried project-specific identifiers (team UUIDs, project UUIDs, ticket-tool API keys, domain vocabulary, hardcoded paths) that are inappropriate to redistribute. Instead, this file abstracts the mechanical patterns future-Claude needs to reproduce when building `make-bolt` and `run-bolt`.
+> The original verbatim source code of `make-bolt` and `run-bolt` is **not included** in this package by design. The verbatim code carried project-specific identifiers (team UUIDs, project UUIDs, ticket-tool API keys, domain vocabulary, hardcoded paths) that are inappropriate to redistribute. Instead, this file abstracts the mechanical patterns future-Claude needs to reproduce when building `make-bolt` and `run-bolt`.
 >
-> The master plan (`plans/2026-05-02-make-bolt-run-bolt-port-spec.md`) describes the *upgrades* over the source skills. This file describes the *mechanics* of the source skills themselves so future-Claude can recognize the patterns being upgraded.
+> The master plan (`plans/2026-05-02-make-bolt-run-bolt-port-spec.md`) describes the *upgrades* over make-bolt + run-bolt. This file describes the *mechanics* of make-bolt + run-bolt themselves so future-Claude can recognize the patterns being upgraded.
 
 ---
 
-## 1. `make-epic2` (the source skill being upgraded to `make-bolt`)
+## 1. `make-bolt` (this skill being upgraded to `make-bolt`)
 
 ### 1.1 Purpose
-Epic + ticket factory. Accepts requirements in any form (free text, PDFs, screenshots, URLs, YAML), researches the domain (internal KB + web), and emits a ticket-tool epic with run-epic2-ready tickets. Guarantees `/run-epic2` can start at P1 without halting at P0.
+Epic + ticket factory. Accepts requirements in any form (free text, PDFs, screenshots, URLs, YAML), researches the domain (internal KB + web), and emits a ticket-tool epic with run-bolt-ready tickets. Guarantees `/run-bolt` can start at P1 without halting at P0.
 
 ### 1.2 Three modes
 - **CREATE** — new epic from requirements
@@ -23,7 +23,7 @@ Mode detection: first positional argument matching `^EP-[A-Z0-9-]+$` switches CR
 2. **RESEARCH** — sub-agent reads internal KB, related tickets, architecture rules, codebase structure; emits `<scratch>/research-brief.md`
 3. **DECOMPOSE** — sub-agent emits ticket candidates as JSON: `{t_id, title, summary, acceptance_criteria, file_scope_claims, dod_category, kb_impact, dependencies, labels, priority, estimate_hours, migration, wave_order}`
 4. **VALIDATE** — structural checks: file_scope_claims non-empty, ACs non-empty + measurable + non-vague, estimate ≤ 4h, title ≤ 50 chars, DAG acyclic (Tarjan SCC), REG-1..6 coverage, migration serialization, no service-root paths
-5. **DIFF** — generate human-readable markdown diff at `<plans>/make-epic2-<EPIC>-diff.md`; **pause** for explicit `approve` from user
+5. **DIFF** — generate human-readable markdown diff at `<plans>/make-bolt-<EPIC>-diff.md`; **pause** for explicit `approve` from user
 6. **WRITE** — only after approval: idempotent ticket creation via label-keyed search; never modifies In-Progress or Done tickets; commits scaffolding files (path-claims.yaml, policy.yaml) to repo
 
 ### 1.4 Halt-Quality Contract — measurable-AC verbs (regex)
@@ -40,11 +40,11 @@ Mode detection: first positional argument matching `^EP-[A-Z0-9-]+$` switches CR
 ```
 
 ### 1.6 Idempotency
-Issue creation searches by labels first (`epic:<EPIC>`, `t-id:<TID>`); creates only if absent. Comment creation prepends `<!-- run-epic2:<key> -->` marker; skips if marker already present in last 50 comments. Relations check existing list before creating.
+Issue creation searches by labels first (`epic:<EPIC>`, `t-id:<TID>`); creates only if absent. Comment creation prepends `<!-- run-bolt:<key> -->` marker; skips if marker already present in last 50 comments. Relations check existing list before creating.
 
 ---
 
-## 2. `run-epic2` (the source skill being upgraded to `run-bolt`)
+## 2. `run-bolt` (this skill being upgraded to `run-bolt`)
 
 ### 2.1 Purpose
 Autonomous per-epic executor. Picks DAG-ready tickets in waves, spawns `Agent` sub-agents with `isolation="worktree"`, merges serially with KB-sync + cross-merge audit, runs reopen engine on regression / KB-break / mandatory-test changes / supersession.
@@ -180,14 +180,14 @@ Detect change type from `git diff --name-only base_sha...HEAD`:
 
 ---
 
-## 3. Branch + commit conventions (source skills)
+## 3. Branch + commit conventions (make-bolt + run-bolt)
 - Work branches: `<skill-prefix>/<epic-slug>/<ticket>` (created by harness via `isolation="worktree"`, then renamed post-hoc, then pushed immediately to survive worktree cleanup)
 - Audit branch: `<skill-prefix>/audit/<epic>` (orphan)
 - Commit message: `feat(<epic>): <title> (<TID>)\n\nTickets: <TID>[, <TID>...]\n<body>` — the `Tickets:` line is mandatory and parsed by reopen-(a)
 
 ---
 
-## 4. What the source skills did NOT do (and `make-bolt` / `run-bolt` MUST do)
+## 4. What make-bolt + run-bolt did NOT do (and `make-bolt` / `run-bolt` MUST do)
 - No knowledge graph maintenance — bolt adds DuckDB + Tree-sitter KG (master plan §7, §26)
 - No app-type detection — bolt adds 7-profile detector (master plan §10)
 - No self-improvement loop — bolt adds two-tier with allowlist (master plan §9)
@@ -199,9 +199,9 @@ Detect change type from `git diff --name-only base_sha...HEAD`:
 ---
 
 ## 5. What this file does NOT contain
-- No verbatim source code from the source skills (omitted by design)
+- No verbatim source code from make-bolt + run-bolt (omitted by design)
 - No project-specific UUIDs, team IDs, or API keys
 - No domain vocabulary tied to the original project's industry niche
-- No file paths from the source-project repo
+- No file paths from the project repo
 
-If future-Claude needs the verbatim source skills for any reason, the source-project owner can supply them out-of-band; they are not part of this redistributable package.
+If future-Claude needs the verbatim make-bolt + run-bolt for any reason, the project owner can supply them out-of-band; they are not part of this redistributable package.

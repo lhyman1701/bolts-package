@@ -79,14 +79,14 @@ if [[ -f "$PKG_ROOT/protocols/no-blockers-mandatory.md" ]]; then
   echo "    ✓ .claude/protocols/no-blockers-mandatory.md"
 fi
 
-# 4. Reference (abstracted source-skill mechanics — no verbatim code)
+# 4. Reference (abstracted bolt mechanics — no verbatim code)
 mkdir -p "$TARGET/.claude/reference"
 echo ""
 echo "==> Copying reference/"
-if [[ -f "$PKG_ROOT/reference/SOURCE-SKILL-MECHANICS.md" ]]; then
-  cp "$PKG_ROOT/reference/SOURCE-SKILL-MECHANICS.md" \
-     "$TARGET/.claude/reference/SOURCE-SKILL-MECHANICS.md"
-  echo "    ✓ .claude/reference/SOURCE-SKILL-MECHANICS.md"
+if [[ -f "$PKG_ROOT/reference/BOLT-MECHANICS.md" ]]; then
+  cp "$PKG_ROOT/reference/BOLT-MECHANICS.md" \
+     "$TARGET/.claude/reference/BOLT-MECHANICS.md"
+  echo "    ✓ .claude/reference/BOLT-MECHANICS.md"
 fi
 
 # 5. .gitignore additions (idempotent)
@@ -125,7 +125,7 @@ REQUIRED=(
   ".claude/plans/MANIFEST.sha256"
   ".claude/rules/accountability.md"
   ".claude/protocols/no-blockers-mandatory.md"
-  ".claude/reference/SOURCE-SKILL-MECHANICS.md"
+  ".claude/reference/BOLT-MECHANICS.md"
 )
 ALL_PRESENT=true
 echo ""

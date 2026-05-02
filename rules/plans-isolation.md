@@ -4,7 +4,7 @@
 
 `~/.claude/plans/` is a **GLOBAL** directory shared across ALL projects on this machine. Reading plans from there without verification leads to cross-project contamination.
 
-**Incident:** On 2026-02-21, a session read a plan from `~/.claude/plans/` that belonged to CarEase (a different project) and incorrectly included it in the the source project session summary.
+**Incident:** On 2026-02-21, a session read a plan from `~/.claude/plans/` that belonged to CarEase (a different project) and incorrectly included it in the the project session summary.
 
 ## Rules
 

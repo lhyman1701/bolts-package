@@ -3,7 +3,7 @@
 > **Version:** v1.0.0 (pinned to master plan revision dated 2026-05-02)
 > **Master plan:** `.claude/plans/2026-05-02-make-bolt-run-bolt-port-spec.md` (27 sections, 1,240 lines)
 > **Research files:** `.claude/plans/2026-05-02-make-bolt-kg-research.md`, `.claude/plans/2026-05-02-make-bolt-hipaa-research.md`, `.claude/plans/2026-05-02-make-bolt-perfection-research.md`
-> **Reference (gitignored):** `.claude/reference/make-epic2/`, `.claude/reference/run-epic2/`, `.claude/reference/2026-04-25-run-epic2-design.md`
+> **Reference (gitignored):** `.claude/reference/make-bolt/`, `.claude/reference/run-bolt/`, `.claude/reference/2026-04-25-run-bolt-design.md`
 >
 > **Usage:** Open Claude Code in the new project. Type `/plan` to enter plan mode. Paste the entire `## Prompt` section verbatim. Do not paraphrase, do not summarize, do not omit lines. Future-Claude reads this prompt as a contract.
 
@@ -19,9 +19,9 @@ test -f .claude/plans/2026-05-02-make-bolt-kg-research.md && \
 test -f .claude/plans/2026-05-02-make-bolt-hipaa-research.md && \
 test -f .claude/plans/2026-05-02-make-bolt-perfection-research.md && \
 test -f .claude/plans/2026-05-02-make-bolt-KICKOFF-PROMPT.md && \
-test -d .claude/reference/make-epic2 && \
-test -d .claude/reference/run-epic2 && \
-test -f .claude/reference/2026-04-25-run-epic2-design.md && \
+test -d .claude/reference/make-bolt && \
+test -d .claude/reference/run-bolt && \
+test -f .claude/reference/2026-04-25-run-bolt-design.md && \
 test -d .claude/rules && \
 test -f .claude/protocols/no-blockers-mandatory.md && \
 echo "PREFLIGHT-OK" || echo "PREFLIGHT-FAIL — restore missing files before kicking off"
@@ -47,9 +47,9 @@ per the master plan at .claude/plans/2026-05-02-make-bolt-run-bolt-port-spec.md.
    (knowledge-graph subsystem + DuckDB DDL)
 4. .claude/plans/2026-05-02-make-bolt-hipaa-research.md
    (HIPAA + AI review + self-improvement + app-type detector + prompt skeletons)
-5. .claude/reference/make-epic2/, .claude/reference/run-epic2/,
-   .claude/reference/2026-04-25-run-epic2-design.md
-   (source skills — read for mechanics, do not copy verbatim; bolt is an
+5. .claude/reference/make-bolt/, .claude/reference/run-bolt/,
+   .claude/reference/2026-04-25-run-bolt-design.md
+   (make-bolt + run-bolt — read for mechanics, do not copy verbatim; bolt is an
    upgrade not a clone)
 6. .claude/rules/*.md and .claude/protocols/no-blockers-mandatory.md
    (anti-laziness contracts)
@@ -64,7 +64,7 @@ read-back before any further work.
 - Project profile: .NET + Angular/React on Azure Repos + Azure Pipelines, full
   HIPAA mode, ticket tool TBD until build-time. (§2 Decisions Locked, §6 Target
   Profile)
-- All 22 Hard Invariants apply: 17 ported from run-epic2 + 5 new in §23. No
+- All 22 Hard Invariants apply: 17 designed for run-bolt + 5 new in §23. No
   exceptions. Re-read §23 before each phase.
 - §13 anti-laziness directives + §21 anti-drift directives apply to YOU
   (future-Claude) as well as to bolt's sub-agents. The forbidden phrases in
@@ -184,9 +184,7 @@ you — claiming higher must produce evidence.
 | `.claude/plans/2026-05-02-make-bolt-build-log.md` | Created by future-Claude at M0; appended at every milestone close |
 | `.claude/plans/2026-05-02-make-bolt-readback.md` | Created by future-Claude in step 1; gates code start |
 | `.claude/plans/2026-05-02-make-bolt-risk-register.md` | Created by future-Claude at M0; one entry per Mn |
-| `.claude/reference/make-epic2/` | Source skill (read-only reference) |
-| `.claude/reference/run-epic2/` | Source skill (read-only reference) |
-| `.claude/reference/2026-04-25-run-epic2-design.md` | Source design doc |
+| `.claude/reference/BOLT-MECHANICS.md` | Mechanical contract for both skills (phase order, halt-quality contract, gates, etc.) |
 | `.claude/rules/accountability.md` | Anti-evasion contracts |
 | `.claude/rules/diagnostics.md` | Diagnostic-first protocol |
 | `.claude/rules/completion-contracts.md` | Completion contract pattern |

@@ -2,7 +2,7 @@
 
 ## The Problem
 
-On 2026-04-30, I claimed "validate all NCCI loaders 100%" but only validated 5 of 16 loaders. This nearly shipped incomplete work to production.
+On 2026-04-30, I claimed "validate all domain-specific edits loaders 100%" but only validated 5 of 16 loaders. This nearly shipped incomplete work to production.
 
 **Root cause:** No explicit completion criteria before starting work. I made implicit "obviously not critical" shortcuts.
 
@@ -42,7 +42,7 @@ Before claiming done:
 ## Applies To
 
 - Direct work by me
-- All skills I invoke (/work, /run-epic2, /test, /deploy, /audit-deep, etc.)
+- All skills I invoke (/work, /run-bolt, /test, /deploy, /audit-deep, etc.)
 - All agents I spawn
 - All sub-agents they spawn
 - **ESPECIALLY Linear tickets** - ACs are high-level, must expand to concrete checklist
@@ -58,7 +58,7 @@ enforce_completion_contract "$WORK_ID"
 
 Skills that MUST use this:
 - `/work` - implements Linear tickets
-- `/run-epic2` - processes epics
+- `/run-bolt` - processes epics
 - `/test` - runs test suites
 - `/deploy` - deploys to environments
 - `/audit-deep` - validates compliance

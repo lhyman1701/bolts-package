@@ -1,33 +1,33 @@
-# Plan: Build `make-bolt` + `run-bolt` — Port and Upgrade make-epic2 / run-epic2 for the Azure-Hosted HIPAA Project
+# Plan: Build `make-bolt` + `run-bolt` — Port and Upgrade make-bolt + run-bolt for the Azure-Hosted HIPAA Project
 
 > **Plan deliverable.** This file is the spec that another Claude session, in a different repo, will execute to build the two skills. Do not begin implementation from this session — the user will say "start" in a future session, possibly after editing this plan.
 >
 > **Mirror.** Per `.claude/rules/plans-isolation.md`, after the user accepts this plan a copy is mirrored to `<repo>/.claude/plans/2026-05-02-make-bolt-run-bolt-port-spec.md` in the new project. This file in `~/.claude/plans/` is the harness-forced version.
 >
 > **Companion research files** (read these — they are NOT optional):
-> - `~/.claude/plans/examine-thoroughly-make-epic2-and-warm-kahan-agent-a9a76c3c8f238621b.md` — knowledge-graph subsystem spec (Tree-sitter grammars, DuckDB schema, gate inventory, embeddings, ~3,800 words + DuckDB DDL)
-> - `~/.claude/plans/examine-thoroughly-make-epic2-and-warm-kahan-agent-afa031cebd118a292.md` — HIPAA + AI-review + self-improvement + app-type detection (~3,800 words + 3 appendices)
-> - `~/.claude/plans/examine-thoroughly-make-epic2-and-warm-kahan-perfection-research.md` — accuracy + defect-rate ceilings (~3,800 words + 80+ citations + Recommendation A/B). **Required reading before §26-§27.**
-> - The source skills (make-epic2 / run-epic2) at `.claude/skills/make-epic2/` and `.claude/skills/run-epic2/` plus `.claude/plans/2026-04-25-run-epic2-design.md`
+> - `~/.claude/plans/examine-thoroughly-make-bolt-and-warm-kahan-agent-a9a76c3c8f238621b.md` — knowledge-graph subsystem spec (Tree-sitter grammars, DuckDB schema, gate inventory, embeddings, ~3,800 words + DuckDB DDL)
+> - `~/.claude/plans/examine-thoroughly-make-bolt-and-warm-kahan-agent-afa031cebd118a292.md` — HIPAA + AI-review + self-improvement + app-type detection (~3,800 words + 3 appendices)
+> - `~/.claude/plans/examine-thoroughly-make-bolt-and-warm-kahan-perfection-research.md` — accuracy + defect-rate ceilings (~3,800 words + 80+ citations + Recommendation A/B). **Required reading before §26-§27.**
+> - The make-bolt + run-bolt (make-bolt + run-bolt) at `.claude/skills/make-bolt/` and `.claude/skills/run-bolt/` plus `.claude/plans/2026-04-25-run-bolt-design.md`
 
 ---
 
 ## 1. Context — Why This Exists
 
-The user has shipped make-epic2 + run-epic2 in the the source project (this repo). They proved out a decomposition-and-execution loop that:
+The user has shipped make-bolt + run-bolt in the the project (this repo). They proved out a decomposition-and-execution loop that:
 
-- Accepts arbitrary requirements (text, PDFs, screenshots, URLs, YAML), researches them, decomposes into HQC-compliant tickets, validates a DAG, gates writes behind a diff-approval, then writes to Linear (`make-epic2`).
-- Executes those tickets with worktree fan-out parallelism, brown-field adoption grading, halt-quality contracts, KB-sync, mutation testing, GitHub PR automation, and reopen detection across five triggers (`run-epic2`).
+- Accepts arbitrary requirements (text, PDFs, screenshots, URLs, YAML), researches them, decomposes into HQC-compliant tickets, validates a DAG, gates writes behind a diff-approval, then writes to Linear (`make-bolt`).
+- Executes those tickets with worktree fan-out parallelism, brown-field adoption grading, halt-quality contracts, KB-sync, mutation testing, GitHub PR automation, and reopen detection across five triggers (`run-bolt`).
 
 The user is starting a **different project** that:
 
 - Is **Azure-hosted**, **.NET (C#) backend + Angular/React frontend**, **Azure Repos + Azure Pipelines**.
 - Handles **PHI in production — full HIPAA exposure**.
-- Has a **complex UX/UI** (so E2E + accessibility gates matter more than in the source project).
+- Has a **complex UX/UI** (so E2E + accessibility gates matter more than in the project).
 - Will use a **TBD ticket tool** — chosen at build-time.
 - Wants the same orchestration power but **upgraded** for 2026 Claude Code, with a **codebase knowledge graph** maintained across runs, **self-improvement**, and **app-type-aware** HIPAA/security/AI gates.
 
-The two new skills (`make-bolt`, `run-bolt`) must be **as powerful or more so** than the originals, **not slavish ports**. Where the originals carry the source project-specific assumptions (healthcare vocabulary, services/ folder, gh CLI) we replace with abstractions; where the originals lack a feature the user wants (knowledge graph, self-improvement, app-type gates) we add it; where 2026 Claude Code offers a better primitive (agent teams, isolation: worktree, opusplan, model+effort frontmatter) we upgrade.
+The two new skills (`make-bolt`, `run-bolt`) must be **as powerful or more so** than , **not slavish ports**. Where  carry the project-specific assumptions (healthcare vocabulary, services/ folder, gh CLI) we replace with abstractions; where  lack a feature the user wants (knowledge graph, self-improvement, app-type gates) we add it; where 2026 Claude Code offers a better primitive (agent teams, isolation: worktree, opusplan, model+effort frontmatter) we upgrade.
 
 ---
 
@@ -48,7 +48,7 @@ Captured from the user's three rounds of answers. These are **non-negotiable** u
 | 9 | **Source + CI: Azure Repos + Azure Pipelines** | Branch creation via `git` over HTTPS with PAT, PRs via `az repos pr create`, CI status via Azure Pipelines REST. **No `gh` CLI dependency.** |
 | 10 | **Performance gates: NONE at v1** | Lighthouse / k6 / App Insights deferred. Quality gates at v1: unit, integration, E2E (Playwright), mutation, contract, accessibility (axe-core), security (gitleaks + dep CVE + ASVS check). |
 | 11 | **AI review: mandatory 3-reviewer (code-reviewer + security-reviewer + HIPAA-reviewer) sub-agents on every PR** | Run in parallel during P3 MERGE-WAVE. Each emits a structured-JSON verdict. Critical-issue verdict from any reviewer **blocks merge**. Costs more tokens; the user explicitly accepted this trade-off for HIPAA. |
-| 12 | **ADR home: `docs/adr/` + per-epic state in `docs/run-bolt/<epic>/`** | Audit branch is `bolt/audit/<epic>` (orphan, mirroring `re2/audit/<epic>`). |
+| 12 | **ADR home: `docs/adr/` + per-epic state in `docs/run-bolt/<epic>/`** | Audit branch is `bolt/audit/<epic>` (orphan, mirroring `bolt/audit/<epic>`). |
 
 ---
 
@@ -56,7 +56,7 @@ Captured from the user's three rounds of answers. These are **non-negotiable** u
 
 ### Goals (must-haves)
 
-- **G1** Functional parity with make-epic2 + run-epic2: 3 modes (CREATE/MODIFY/REVERIFY), 6 phases of make, P0/P0.5/P1-P3/P4 of run, 5 reopen triggers, halt-quality contract, idempotent ticket writes, diff-gated writes, brown-field adoption.
+- **G1** Functional parity with make-bolt + run-bolt: 3 modes (CREATE/MODIFY/REVERIFY), 6 phases of make, P0/P0.5/P1-P3/P4 of run, 5 reopen triggers, halt-quality contract, idempotent ticket writes, diff-gated writes, brown-field adoption.
 - **G2** **Ticket-tool agnosticism** via a `TicketClient` Python protocol with four stock adapters. Switching backends is config-only, not code-only.
 - **G3** **Tech-stack adapters** for .NET + Angular/React on Azure: every quality gate selects runner by language + path glob.
 - **G4** **Full HIPAA gates** baked in by default when the app-type detector classifies the project as HIPAA-exposed.
@@ -72,9 +72,9 @@ Captured from the user's three rounds of answers. These are **non-negotiable** u
 - **NG1** Performance gates (Lighthouse / k6 / App Insights) — deferred per user.
 - **NG2** Neo4j / Memgraph KG — strangler-fig path documented; v1 is DuckDB-only.
 - **NG3** Multi-tenant SaaS execution model — bolt runs single-tenant, single-repo, single-developer-machine. No hosted-orchestrator.
-- **NG4** Auto-deploy. AWS/Azure deploy stays human-driven (mirrors the source project's Hard Invariant #11).
+- **NG4** Auto-deploy. AWS/Azure deploy stays human-driven (mirrors the project's Hard Invariant #11).
 - **NG5** Cross-repo orchestration. One repo, one bolt config, one set of tickets.
-- **NG6** Backwards-compatibility with make-epic2/run-epic2 audit data. The new project has no the source project history to import.
+- **NG6** Backwards-compatibility with make-bolt + run-bolt audit data. The new project has no the project history to import.
 
 ---
 
@@ -140,17 +140,9 @@ The v1 implementation **must preserve seams** for these migrations. Specifically
 
 ---
 
-## 5. Source-Skill Mechanical Inventory (Pointer)
+## 5. Bolt Mechanics Reference (Pointer)
 
-The complete mechanical spec of make-epic2 + run-epic2 is captured by three sources. Read in this order:
-
-1. **`/tmp/run_epic2_agent_report.md`** (extracted from this session — 1,171 lines): exhaustive run-epic2 spec covering invocation, phase order, hard invariants, state persistence, Linear client + write mutations, execution driver, sub-agent prompt + manifest contract, reopen engine, KB-sync pipeline, policy + configuration, branch strategy + git automation, regression + REG enforcement, halt categories + circuit breaker, concurrent execution + context management, the source project-specific assumptions, critical files reference, porting checklist.
-
-2. **The make-epic2 inventory** delivered earlier in this conversation by the first Explore agent. Coverage: invocation forms, three modes (CREATE / MODIFY / REVERIFY), six phases (Ingest / Research / Decompose / Validate / Diff / Write), every halt code, regex patterns for vague phrases + measurable verbs, REG-1..6 auto-generation, diff-gating mechanism, Linear-specific assumptions, EPIC_REGISTRY, state + persistence, templates, plan files, KB validators, ambiguity handling.
-
-3. **The shared-infrastructure inventory** delivered earlier by the third Explore agent. Coverage: shared modules in `re2_shared/` (linear_client.py, repo_paths.py, git_notes.py), Linear API surface area (queries + mutations + auth + rate limits), the source project-specific assumptions (healthcare vocabulary, folder + path conventions, GitHub hardcoding), make-epic2 coupling to re2_shared, architecture rules + quality gates, hooks + protocols, settings + secrets, self-improving behavior (none), summary porting checklist.
-
-The implementer working from this plan must **read all three reports** before writing a line of code. They are the source of truth for what runs in the source project today; this plan describes what the **new** skills must do **differently** or **better**.
+The complete mechanical contract for `make-bolt` + `run-bolt` is at `reference/BOLT-MECHANICS.md` in this package — phase order, halt-quality contract, idempotency rules, reopen engine, manifest schema, quality gates, auto-resolve ladders, circuit breaker, branch + commit conventions. Read it alongside this master plan; both are authoritative. If they disagree, this master plan wins.
 
 ---
 
@@ -250,7 +242,7 @@ gates:
     hipaa_reviewer: required             # auto-disabled if app_type == none
 
 policy:
-  # Mirrors run-epic2 policy.template.yaml shape
+  # Mirrors run-bolt policy.template.yaml shape
   schema_version: 1
   policy_version: 1
   auto_create_regression: true
@@ -317,7 +309,7 @@ This config is the **single source of project-specific knobs**. Bolt code reads 
 
 ## 7. Knowledge Graph Subsystem
 
-**Authoritative spec:** `~/.claude/plans/examine-thoroughly-make-epic2-and-warm-kahan-agent-a9a76c3c8f238621b.md`. Summary here for context.
+**Authoritative spec:** `~/.claude/plans/examine-thoroughly-make-bolt-and-warm-kahan-agent-a9a76c3c8f238621b.md`. Summary here for context.
 
 ### 7.1 Storage
 
@@ -366,7 +358,7 @@ The research file delivers the full DuckDB DDL. Tables: `meta`, `commits`, `file
 
 ## 8. Ticket-Tool Adapter Pattern
 
-**The crux of the port.** the source project hardcoded Linear; bolt must not. The pattern:
+**The crux of the port.** the project hardcoded Linear; bolt must not. The pattern:
 
 ```python
 # bolt_shared/ticket_client/protocol.py
@@ -423,13 +415,13 @@ class TicketClient(Protocol):
 
 ### Halt-rule preservation
 
-Hard Invariant #7 from run-epic2 (Linear writes locked) generalizes to: **every adapter must hold a module-level `threading.Lock()` around all mutations**. Hard Invariant #12 (idempotent via stable labels) generalizes to: **every adapter must implement label-or-tag-based idempotency**. Adapters that can't (e.g., a hypothetical adapter without label support) cannot be used with bolt.
+Hard Invariant #7 from run-bolt (Linear writes locked) generalizes to: **every adapter must hold a module-level `threading.Lock()` around all mutations**. Hard Invariant #12 (idempotent via stable labels) generalizes to: **every adapter must implement label-or-tag-based idempotency**. Adapters that can't (e.g., a hypothetical adapter without label support) cannot be used with bolt.
 
 ---
 
 ## 9. Self-Improvement Subsystem
 
-**Authoritative spec:** `~/.claude/plans/examine-thoroughly-make-epic2-and-warm-kahan-agent-afa031cebd118a292.md` Appendix B (full YAML policy).
+**Authoritative spec:** `~/.claude/plans/examine-thoroughly-make-bolt-and-warm-kahan-agent-afa031cebd118a292.md` Appendix B (full YAML policy).
 
 ### 9.1 Two-tier change classification
 
@@ -610,7 +602,7 @@ The full skeleton lives in research file Appendix C.
 
 ## 13. Anti-Laziness Directives — Strict, Evidence-Based
 
-Bolt inherits the source project's rules verbatim and adds three structural enforcers.
+Bolt uses the project's rules verbatim and adds three structural enforcers.
 
 ### 13.1 Inherited rules (port to the new project's `.claude/rules/`)
 
@@ -622,8 +614,8 @@ Bolt inherits the source project's rules verbatim and adds three structural enfo
 
 ### 13.2 Bolt-specific structural enforcers
 
-1. **`halt-validator`** rejects any halt-N.md missing authoritative-sources, alternates with `rejected_because` evidence, or with `unblocking_decision_required_from_human` containing vague language. Verbatim from run-epic2; **no relaxation**.
-2. **`completion-contract.yaml`** — every ticket must declare a `completion_contract` block listing concrete done criteria. The orchestrator at P3 MERGE-WAVE diffs the manifest against the contract; mismatches halt `completion_contract_mismatch`. (This was a 2026-04-30 the source project incident; the rule is now structural.)
+1. **`halt-validator`** rejects any halt-N.md missing authoritative-sources, alternates with `rejected_because` evidence, or with `unblocking_decision_required_from_human` containing vague language. Verbatim from run-bolt; **no relaxation**.
+2. **`completion-contract.yaml`** — every ticket must declare a `completion_contract` block listing concrete done criteria. The orchestrator at P3 MERGE-WAVE diffs the manifest against the contract; mismatches halt `completion_contract_mismatch`. (This was a 2026-04-30 the project incident; the rule is now structural.)
 3. **`tool-call audit`** — every manifest's `tool_calls[]` is cross-checked against `events.jsonl`. Any research / web / AskUserQuestion call without a preceding `decisions/0001-analysis-<ticket>.md` halts `manifest_tool_calls_mismatch`.
 
 ### 13.3 Forbidden patterns (baked into prompts)
@@ -639,7 +631,7 @@ The sub-agent system prompt explicitly forbids:
 
 ### 13.4 Never-halt-without-research
 
-Inherits the source project's rule: for halt categories `{kb_conflict, ambiguous_requirement, regression, coverage_below_bar, mutation_below_bar}`, the sub-agent must have written `<scratch>/decisions/NNNN-research-<topic>.md` within 30 min of the halt. Validator enforces.
+Inherits the project's rule: for halt categories `{kb_conflict, ambiguous_requirement, regression, coverage_below_bar, mutation_below_bar}`, the sub-agent must have written `<scratch>/decisions/NNNN-research-<topic>.md` within 30 min of the halt. Validator enforces.
 
 ---
 
@@ -697,7 +689,7 @@ def bootstrap_mcps(config: BoltConfig) -> BootstrapResult:
 
 ## 15. Phase Order — Bolt-Specific Differences
 
-Bolt mostly mirrors run-epic2's phase order but with **five additions**:
+Bolt mostly mirrors run-bolt's phase order but with **five additions**:
 
 ```
 P-1  MCP-BOOTSTRAP        → verify MCPs (NEW)
@@ -712,7 +704,7 @@ P4   EPIC-CLOSE           → audit summary + reopen sweep + report
 P5   SELF-IMPROVE-CHECK   → drift detect + emit L0 changes / open L1+ PR (NEW, runs every Nth invocation)
 ```
 
-`make-bolt` mirrors make-epic2's six phases with a new **P0.5 SCHEMA-VALIDATE** phase that schema-checks the candidate ticket JSON against `manifest.schema.json` before the diff phase.
+`make-bolt` mirrors make-bolt's six phases with a new **P0.5 SCHEMA-VALIDATE** phase that schema-checks the candidate ticket JSON against `manifest.schema.json` before the diff phase.
 
 ### 15.1 Phase 5 SELF-IMPROVE-CHECK (concrete steps)
 
@@ -748,7 +740,7 @@ P5   SELF-IMPROVE-CHECK   → drift detect + emit L0 changes / open L1+ PR (NEW,
 - `SKILL.md` — frontmatter, all phases including new P-1 / P-0 / P0.25 / P3.5 / P5
 - `scripts/`:
   - `run_bolt.py` — CLI entry
-  - `live_driver.py` — orchestrator wave-slice driver (port of the source project's)
+  - `live_driver.py` — orchestrator wave-slice driver (port of the project's)
   - `live_helpers.py` — adapter wrappers (state_fetcher, state_mutator, commenter, grader)
   - `run_bolt_orchestrator.py` — phase coordination
   - `run_bolt_adopt.py` — P0.75 ADOPT
@@ -809,10 +801,10 @@ P5   SELF-IMPROVE-CHECK   → drift detect + emit L0 changes / open L1+ PR (NEW,
 `docs/`:
 - `adr/0001-bolt-adoption.md` — initial decision record
 - `run-bolt/policy.template.yaml`
-- `run-bolt/<EPIC>/` — per-epic state (mirrors `docs/run-epic2/<EPIC>/`)
+- `run-bolt/<EPIC>/` — per-epic state (mirrors `docs/run-bolt/<EPIC>/`)
 
 `.claude/`:
-- `rules/accountability.md`, `rules/diagnostics.md`, `rules/completion-contracts.md`, `rules/plans-isolation.md` — port from the source project
+- `rules/accountability.md`, `rules/diagnostics.md`, `rules/completion-contracts.md`, `rules/plans-isolation.md` — port from the project
 - `protocols/no-blockers-mandatory.md` — port + new-project KB references
 - `hooks/skill-pre-exec.sh` — port + adapt
 - `shared/validation-protocol.sh` — port + adapt
@@ -821,14 +813,14 @@ P5   SELF-IMPROVE-CHECK   → drift detect + emit L0 changes / open L1+ PR (NEW,
 
 ## 17. Verification Plan
 
-### 17.1 Acceptance gate (mirrors run-epic2's)
+### 17.1 Acceptance gate (mirrors run-bolt's)
 
 ```bash
 python3 -m pytest tests/integration/test_run_bolt_M[0-5]*.py \
     --override-ini="addopts=" --no-cov
 ```
 
-Expected: ≥ run-epic2's 187 tests, plus new ones for KG, ticket adapters, AI reviewers, self-improver.
+Expected: ≥ run-bolt's 187 tests, plus new ones for KG, ticket adapters, AI reviewers, self-improver.
 
 ### 17.2 End-to-end smoke (the bolt equivalent of EP-SMOKE-001)
 
@@ -858,7 +850,7 @@ Mock the four drift signals (Claude Code changelog with synthetic L0 + L2 change
 
 ## 18. Implementation Milestones (Suggested Order)
 
-Match the source project's M0-M5c structure but compressed (the patterns are battle-tested):
+Match the project's M0-M5c structure but compressed (the patterns are battle-tested):
 
 | M | Goal | Estimated effort |
 |---|---|---|
@@ -901,7 +893,7 @@ These are **not blocking the plan's completeness** but the implementer should re
 6. **Mutation runner version pinning.** Stryker.NET and Stryker-JS versions go into `policy.auto_install_allowlist`. Pin at M3 start.
 7. **AI reviewer prompts — final wording.** Research file Appendix C has skeletons; user reviews and approves before M3.5.
 8. **Self-improver L0 allowlist tuning.** Initial allowlist (Section 6) is a suggestion; user audits before M4.5.
-9. **Hard Invariants — accept all of run-epic2's 17?** The plan assumes yes (Section 23 below). User confirms at M0.
+9. **Hard Invariants — accept all of run-bolt's 17?** The plan assumes yes (Section 23 below). User confirms at M0.
 
 ---
 
@@ -923,7 +915,7 @@ Per `.claude/rules/completion-contracts.md`, the implementer (future-Claude in a
 - [ ] Self-improver: drift signals checked, L0 auto-applies < 3 fields, L1+ opens PR, rollback tag created
 - [ ] State: DuckDB schema applied, audit-writer queue runs, lock cross-checks bolt + (legacy) any prior state dir
 - [ ] MCP bootstrap: verifies all required MCPs; halts on missing in HIPAA mode
-- [ ] All the source project anti-laziness rules (`.claude/rules/`, `.claude/protocols/no-blockers-mandatory.md`) ported and adapted
+- [ ] All the project anti-laziness rules (`.claude/rules/`, `.claude/protocols/no-blockers-mandatory.md`) ported and adapted
 - [ ] Acceptance gate `pytest tests/integration/test_run_bolt_M[0-5]*.py` ≥ 187 passing
 - [ ] End-to-end smoke epic (5 tickets, markdown_stub) passes; audit branch contains all events, KG checksum matches
 - [ ] Pilot epic (first real ticket-tool adapter) completes one ticket cleanly through P4
@@ -945,22 +937,22 @@ Bolting these in here so the future-Claude session that builds bolt cannot ratio
 7. **Do not implement a "self-improver" that can edit SKILL.md mid-session.** Section 9.3 is non-negotiable.
 8. **Do not weaken the halt-quality contract** when porting halts to .NET-specific languages. The validator is text-based but the contract structure is universal.
 9. **Do not use OpenAI / Cohere / Together / Replicate / Hugging Face Inference for anything in HIPAA mode.** BAA allowlist is enforced by `ai_dispatcher.py`.
-10. **Do not start without re-reading run-epic2's 17 Hard Invariants.** They generalize 1:1 to bolt with adapter substitutions; transcribe verbatim into bolt's SKILL.md `## Hard halt rules` section.
+10. **Do not start without re-reading run-bolt's 17 Hard Invariants.** They generalize 1:1 to bolt with adapter substitutions; transcribe verbatim into bolt's SKILL.md `## Hard halt rules` section.
 
 ---
 
-## 22. Summary of What's New in Bolt vs make-epic2/run-epic2
+## 22. Summary of What's New in Bolt vs make-bolt + run-bolt
 
-| Capability | make-epic2 / run-epic2 | make-bolt / run-bolt |
+| Capability | make-bolt + run-bolt | make-bolt / run-bolt |
 |---|---|---|
 | Ticket tool | Linear hardcoded | 4 stock adapters (Azure DevOps / Jira / GitHub / markdown), config-selected |
 | VCS | GitHub via gh CLI | Azure Repos via REST + git over HTTPS PAT, with GitHub adapter retained |
 | CI | GitHub Actions implicit | Azure Pipelines REST adapter |
 | Tech stack gates | Python (pytest, mutmut) + Node (jest, stryker, playwright) | .NET (xunit, stryker.net) + Node (jest, stryker-js, playwright, axe) + dotnet-format / eslint |
-| Audit branch | `re2/audit/<epic>` | `bolt/audit/<epic>` |
-| State dir | `.claude/run-epic2-state/<epic>/` | `.claude/run-bolt-state/<epic>/` |
-| Scratch dir | `~/.run-epic2/scratch/<run-id>/<ANU>/` | `~/.run-bolt/scratch/<run-id>/<TID>/` |
-| KB | `docs/kb/` (the source project-specific) | configurable; bolt's KG replaces most KB-sync use cases |
+| Audit branch | `bolt/audit/<epic>` | `bolt/audit/<epic>` |
+| State dir | `.claude/run-bolt-state/<epic>/` | `.claude/run-bolt-state/<epic>/` |
+| Scratch dir | `~/.run-bolt/scratch/<run-id>/<ANU>/` | `~/.run-bolt/scratch/<run-id>/<TID>/` |
+| KB | `docs/kb/` (the project-specific) | configurable; bolt's KG replaces most KB-sync use cases |
 | Knowledge graph | none | DuckDB + Tree-sitter + 8 v1 gates |
 | App-type detector | none | 7 profiles with weighted heuristics |
 | Self-improvement | none | Two-tier (L0 auto + L1+ PR) with drift signals + 24h cool-down on L3 |
@@ -973,9 +965,9 @@ Bolting these in here so the future-Claude session that builds bolt cannot ratio
 
 ## 23. Hard Invariants (Verbatim Port + 5 New)
 
-The original 17 from run-epic2 (`.claude/skills/run-epic2/SKILL.md` §96-105) port verbatim with adapter substitutions:
+The original 17 from run-bolt (`.claude/skills/run-bolt/SKILL.md` §96-105) port verbatim with adapter substitutions:
 
-1-17 unchanged in spirit; substitute `gh` → `az repos pr` in #1, `Linear` → `ticket_client` in #7, `source-org/source-project` → project-specific in #14, etc.
+1-17 unchanged in spirit; substitute `gh` → `az repos pr` in #1, `Linear` → `ticket_client` in #7, `source-org/project` → project-specific in #14, etc.
 
 **New invariants for bolt:**
 
@@ -983,7 +975,7 @@ The original 17 from run-epic2 (`.claude/skills/run-epic2/SKILL.md` §96-105) po
 19. **Self-improvement never edits SKILL.md mid-session.** All L1+ changes are PRs reviewed in a future session.
 20. **KG corruption forces full rebuild.** No "I know better" path.
 21. **Three AI reviewers run on every PR in HIPAA mode.** No single-reviewer mode.
-22. **Tickets line is mandatory in every commit.** Even single-ticket commits emit `Tickets: BOLT-1234` so reopen-(a) attribution works the same way as run-epic2 (and git_notes.py is verbatim).
+22. **Tickets line is mandatory in every commit.** Even single-ticket commits emit `Tickets: BOLT-1234` so reopen-(a) attribution works the same way as run-bolt (and git_notes.py is verbatim).
 
 ---
 
@@ -1003,7 +995,7 @@ Where I think a better option exists than what bolt v1 ships:
 
 ## 25. First-Run Hardening Protocol (Non-Negotiable)
 
-The user asked whether bolt can ship "0% chance of issue on first run". Honest answer: no software of this size has ever achieved that. This section pushes the realistic odds as close to that target as possible by **structurally preventing** the failure modes that have actually happened on the source skill (run-epic2) first run and the failure modes the plan otherwise leaves open.
+The user asked whether bolt can ship "0% chance of issue on first run". Honest answer: no software of this size has ever achieved that. This section pushes the realistic odds as close to that target as possible by **structurally preventing** the failure modes that have actually happened on this skill (run-bolt) first run and the failure modes the plan otherwise leaves open.
 
 ### 25.1 The ten hardening rules
 
@@ -1032,7 +1024,7 @@ The user asked whether bolt can ship "0% chance of issue on first run". Honest a
    First epic enforces `policy.halt_audit_threshold = 0.10` (1 halt per 10 tickets) **structurally**: orchestrator counts halt events, halts the entire run with `EPIC_PAUSED_FIRST_RUN_HALT_BUDGET` if exceeded, requires human review and `--confirm-paused` to resume. Subsequent epics relax to the standard threshold once first-run signoff exists.
 
 9. **Mutation score floor on bolt's OWN test suite ≥ 0.75 at M5.**
-   Higher bar than what the source project shipped. Bolt is testing other code; bolt's own tests must be more rigorous than the bar bolt enforces on tickets. CI pipeline gates the bolt repo itself with this floor.
+   Higher bar than what the project shipped. Bolt is testing other code; bolt's own tests must be more rigorous than the bar bolt enforces on tickets. CI pipeline gates the bolt repo itself with this floor.
 
 10. **Pre-milestone self-audit by code-reviewer sub-agent.**
     Before each milestone closes, future-Claude spawns the `code-reviewer` and `security-reviewer` sub-agents on the diff of that milestone. Findings either fix or write `docs/adr/<date>-defer-<finding>.md`. No milestone closes with an unaddressed reviewer finding.
@@ -1073,7 +1065,7 @@ Future-Claude **may not** mark M5 done without:
 
 ## 26. KG Accuracy Ceiling — Documented and Mitigated
 
-> **Authoritative research:** `~/.claude/plans/examine-thoroughly-make-epic2-and-warm-kahan-perfection-research.md` Q1 + Recommendation A. Read before disputing any claim in this section.
+> **Authoritative research:** `~/.claude/plans/examine-thoroughly-make-bolt-and-warm-kahan-perfection-research.md` Q1 + Recommendation A. Read before disputing any claim in this section.
 
 ### 26.1 Honest framing
 
@@ -1482,7 +1474,7 @@ Future-Claude **may not** mark M5 done without all of §25.4 + §27.5 PLUS:
 ### 29.8 What this does NOT promise
 
 - The HIPAA-reviewer pre-flight is one cheap LLM pass. It catches obvious PHI-handling violations, not subtle ones. Subtle ones still surface at run-bolt's full P3.5 AI-review (which uses Opus, not Haiku).
-- The KG-scope-coverage check uses calibrated confidence; it inherits the §26 ceiling (~94-96%). A ticket can pass with `kg_scope_coverage = 0.85` and still touch a symbol the KG missed.
+- The KG-scope-coverage check uses calibrated confidence; it uses the §26 ceiling (~94-96%). A ticket can pass with `kg_scope_coverage = 0.85` and still touch a symbol the KG missed.
 - The bridge does NOT predict cross-family AI-judge dissent or calibrated-rejection-threshold misses. Those are runtime measurements; make-bolt cannot foresee them.
 - Adding the bridge does NOT remove run-bolt's runtime gates — it makes them more rarely fire, which is the whole point.
 
@@ -1647,7 +1639,7 @@ Future-Claude **may not** mark M5 done without all of §25.4 + §27.5 + §29.7 P
 ### 30.7 What this still does NOT promise
 
 - The bridge cannot guarantee the *quality* of the unit / E2E tests written by sub-agents at run-bolt P2 — only that the AC requires them. Test quality is policed by mutation score (§27.2 #5), property-based testing (§27.2 #4), and AI reviewers (§11).
-- KG-driven dependency detection inherits the §26 KG accuracy ceiling (~94-96%). Symbols KG missed produce false negatives (missing-dependency check passes when it shouldn't). Calibrated confidence at ≥ 0.85 keeps false positives low; false negatives are acknowledged.
+- KG-driven dependency detection uses the §26 KG accuracy ceiling (~94-96%). Symbols KG missed produce false negatives (missing-dependency check passes when it shouldn't). Calibrated confidence at ≥ 0.85 keeps false positives low; false negatives are acknowledged.
 - Cross-language dependencies (TypeScript frontend calls .NET backend via REST) require the OpenAPI cross-language linker (§26.2 #6). Without it, FE→BE dependency edges go undetected.
 - Pure logical / business dependencies ("ticket B's UX requires the design from ticket A's mockup") are invisible to the KG. Decompose-time prose still has to capture those; the bridge cannot.
 
