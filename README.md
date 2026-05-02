@@ -20,6 +20,38 @@ Both skills maintain a **codebase knowledge graph** (DuckDB + Tree-sitter + opti
 
 ---
 
+## Visual demos
+
+### Install flow (animated)
+
+The full clone → install → integrity-verify sequence on a target project:
+
+![install-flow](assets/install-flow.gif)
+
+> Generated with [VHS](https://github.com/charmbracelet/vhs). Source tape: `assets/install-flow.tape` — re-run `vhs assets/install-flow.tape` to regenerate.
+
+### Package tree
+
+What lands in your target project's `.claude/` after `install.sh`:
+
+![package-tree](assets/package-tree.png)
+
+### Capability matrix at a glance
+
+Which command does what (excerpt — full table further down):
+
+![capability-matrix](assets/capability-matrix.png)
+
+### Kickoff handoff
+
+What you see in Claude Code after pasting the kickoff prompt — the read-back gate halts before any code is written:
+
+![kickoff-handoff](assets/kickoff-handoff.png)
+
+> Generated with [freeze](https://github.com/charmbracelet/freeze). Source text in `assets/`.
+
+---
+
 ## Diagram 1 — How this repo gets used (lifecycle)
 
 ```mermaid
