@@ -1,0 +1,172 @@
+# bolt.config.yaml.example — copy to repo root as bolt.config.yaml at M0
+# Future-Claude fills every <FILL_AT_BUILD_TIME> placeholder.
+# Schema validated by .claude/skills/run-bolt/schemas/bolt.config.schema.json (created at M0).
+
+schema_version: 1
+
+project:
+  name: "<FILL_AT_BUILD_TIME>"
+  app_type: auto                    # auto | hipaa | pii | pci | ferpa | fda_samd | ai_product | none
+  hipaa_mode: true                  # locked at plan revision 2026-05-02
+  data_residency: "<FILL_AT_BUILD_TIME>"   # e.g. us-east, eu-central — pinned for BAA enforcement
+
+stack:
+  backend:
+    language: csharp
+    framework: dotnet
+    test_runners: [xunit, nunit]
+    mutation_runner: stryker_net
+    formatter: dotnet-format
+    linters: [roslyn-analyzers]
+  frontend:
+    framework: "<FILL_AT_BUILD_TIME>"   # angular | react — detector resolves at M1.5
+    test_runners: [jest, playwright]
+    mutation_runner: stryker_js
+    formatter: prettier
+    linters: [eslint]
+    a11y: axe_core
+  database:
+    primary: "<FILL_AT_BUILD_TIME>"     # sql_server | cosmos_db
+    migrations: ef_core
+  cloud: azure
+  hosting: "<FILL_AT_BUILD_TIME>"       # app_service | aks | container_apps | functions
+
+vcs:
+  backend: azure_repos
+  organization: "<FILL_AT_BUILD_TIME>"
+  project: "<FILL_AT_BUILD_TIME>"
+  repo: "<FILL_AT_BUILD_TIME>"
+  default_branch: main
+  branch_prefix: bolt/                  # work branches: bolt/<epic-slug>/<ticket>
+  audit_branch_prefix: bolt/audit/      # orphan audit branches
+
+ci:
+  backend: azure_pipelines
+  pipeline_id: "<FILL_AT_BUILD_TIME>"
+  required_status_checks:
+    - "build"
+    - "test"
+    - "security-scan"
+
+ticket_tool:
+  backend: markdown_stub                # default at M0; user overrides to azure_devops | jira | github_issues at adapter-selection time
+  config: {}
+
+mcp_required:
+  - context7
+  - mcp__memory__
+  - filesystem
+  - azure_devops                        # iff ticket_tool.backend == azure_devops
+  - atlassian_jira                      # iff ticket_tool.backend == jira
+
+paths:
+  bolt_state_dir: ".claude/run-bolt-state"
+  bolt_scratch_dir: "~/.run-bolt/scratch"
+  bolt_kg_path: ".bolt/kg.duckdb"
+  bolt_audit_dir: "docs/run-bolt"
+  adr_dir: "docs/adr"
+  src_dirs: ["src/", "services/", "apps/"]      # repo-specific — adjust at M0
+  test_dirs: ["tests/", "test/", "spec/"]
+  frontend_dir: "<FILL_AT_BUILD_TIME>"
+  migrations_dirs: ["src/Database/Migrations/"]
+
+gates:
+  unit_coverage_floor: 0.80
+  mutation_score_floor: 0.60            # raised to 0.80 for HIPAA-touching code per §27.2 #5
+  e2e_required_for_ui_changes: true
+  accessibility_floor_axe_violations: 0
+  asvs_level: 2                         # bumps to 3 if app_type == fda_samd
+  pre_push_smoke_command: "<FILL_AT_BUILD_TIME>"   # e.g. make smoke-local, pwsh ./smoke.ps1, dotnet test --filter Smoke
+  security_scanners:
+    - gitleaks
+    - dotnet_dependency_check
+    - npm_audit
+    - sarif_aggregator
+  hipaa_extras:
+    - phi_in_logs_scanner
+    - audit_log_emitter_check
+    - encryption_in_transit_assertion
+    - vendor_baa_allowlist
+  ai_reviewers:
+    code_reviewer: required
+    security_reviewer: required
+    hipaa_reviewer: required            # auto-disabled if app_type == none
+
+policy:
+  schema_version: 1
+  policy_version: 1
+  auto_create_regression: true
+  max_reopens_per_run: 5
+  max_reopens_per_ticket: 2
+  max_wave_wallclock_minutes: 90
+  context_threshold_pct: 0.75
+  cost_guard:
+    max_input_tokens_per_ticket: 500000
+    max_output_tokens_per_ticket: 50000
+    max_total_input_tokens_per_run: 10000000
+    max_total_output_tokens_per_run: 1000000
+    max_orchestrator_tokens_per_run: 5000000
+    warn_at_pct: 0.75
+  allow_admin_merge: false
+  halt_audit_threshold: 0.10
+  audit_commit:
+    events_per_batch: 10
+    max_seconds_between_commits: 120
+  first_run_mode:
+    shadow_mode: false                  # CLI --shadow flag overrides; see §25 rule 3
+    enforce_first_run_halt_budget: true
+    require_signoff_md_for_real_adapter: true
+
+self_improver:
+  enabled: false                        # §25 rule 7: ships disabled; flip to true at M5-pilot+1
+  cadence_runs_between_drift_checks: 5
+  l0_auto_apply_allowlist:
+    - "policy.gates.unit_coverage_floor"
+    - "policy.gates.mutation_score_floor"
+    - "policy.gates.accessibility_floor_axe_violations"
+    - "policy.cost_guard.warn_at_pct"
+    - "policy.auto_install_allowlist[*]"
+  drift_signals:
+    - claude_code_changelog_url
+    - anthropic_docs_url_for_skills
+    - owasp_asvs_release_url
+    - hipaa_security_rule_npmr_url
+
+knowledge_graph:
+  storage: duckdb
+  embeddings_provider: "<FILL_AT_BUILD_TIME>"   # bedrock | vertex | azure_openai | bge_m3_local — must be BAA-vetted in HIPAA mode
+  embeddings_model: text-embedding-3-large
+  rebuild_full_when:
+    - "stale_commits >= 50"
+    - "stale_days >= 7"
+    - "schema_change_ticket_merged"
+  parser_excludes: []                    # populated at M1 after parser fuzz pass per §25 rule 5
+  min_confidence_defaults:               # §26.2 #11
+    orchestrator: 0.90
+    planning: 0.70
+    phi_taint: 0.95
+    ai_reviewers: 0.85
+  gates_enabled:
+    - scope_drift
+    - dead_code
+    - blast_radius
+    - coverage_gap
+    - fe_be_drift
+    - migration_without_code
+    - codeowner_notification
+    - asvs_violation
+    # PHI gate is advisory-only at v1
+    # Supersession gate deferred to v2
+
+ai_dispatcher:
+  baa_allowlist_hipaa_mode:
+    - anthropic_direct
+    - aws_bedrock
+    - gcp_vertex
+    - azure_openai
+  forbidden_in_hipaa_mode:
+    - openai_direct
+    - cohere_direct
+    - together_ai
+    - replicate
+    - huggingface_inference

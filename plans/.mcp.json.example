@@ -1,0 +1,39 @@
+{
+  "_comment": "Copy to repo root as .mcp.json. Future-Claude verifies via mcp_bootstrap.py at P-1 of every /run-bolt invocation. Halts in HIPAA mode if any required MCP is missing or unauthenticated. See master plan §14.",
+  "_required_at_v1": ["context7", "memory", "filesystem"],
+  "_required_iff_ticket_tool_matches": {
+    "azure_devops": ["azure_devops"],
+    "jira": ["atlassian_jira"]
+  },
+  "mcpServers": {
+    "context7": {
+      "_purpose": "Library/framework/SDK doc lookups during research phase. Required at v1.",
+      "command": "npx",
+      "args": ["@context7/server"]
+    },
+    "memory": {
+      "_purpose": "Architectural facts, ADR pointers, ownership facts. Complement to local DuckDB KG. Required at v1.",
+      "command": "npx",
+      "args": ["@modelcontextprotocol/server-memory"]
+    },
+    "filesystem": {
+      "_purpose": "Non-repo paths (logs, scratch, sibling repos). Required at v1.",
+      "command": "npx",
+      "args": ["@modelcontextprotocol/server-filesystem", "${REPO_ROOT}"]
+    },
+    "azure_devops": {
+      "_purpose": "Reads only (writes via REST direct per global rule). Required iff ticket_tool == azure_devops.",
+      "_auth_env_var": "AZURE_DEVOPS_PAT",
+      "_install_when": "ticket_tool.backend == 'azure_devops'",
+      "command": "npx",
+      "args": ["@azure/azure-devops-mcp"]
+    },
+    "atlassian_jira": {
+      "_purpose": "Reads only (writes via REST direct). Required iff ticket_tool == jira.",
+      "_auth_env_var": "JIRA_API_TOKEN",
+      "_install_when": "ticket_tool.backend == 'jira'",
+      "command": "npx",
+      "args": ["@atlassian/jira-mcp"]
+    }
+  }
+}
