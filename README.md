@@ -61,6 +61,7 @@ flowchart LR
 | Brown-field adoption (P0.5) — retroactive grading of Done tickets | — | ✓ |
 | Circuit breaker (3 consecutive quality-gate failures → pause) | — | ✓ |
 | Halt-Quality Contract enforcement (every halt validated) | ✓ | ✓ |
+| **Standards-Coherence Bridge** — every ticket validated against run-bolt's full semantic standards (HIPAA AC-compliance, KG-aware scope, mutation-feasibility, mandatory-test-type policy, Dafny-invariant exposure, HIPAA reviewer pre-flight) | ✓ | ✓ |
 | Codebase knowledge graph (DuckDB + Tree-sitter + Roslyn fusion) | reads | reads + writes |
 | App-type detection (HIPAA / PCI / FERPA / FDA-SaMD / AI / PII) | (one-time at M0) | (verified each run) |
 | Self-improvement (L0 auto-apply, L1+ PR proposals) | (drift signals checked) | (drift signals checked) |
@@ -88,10 +89,15 @@ flowchart TD
     P1[P1 INGEST<br/>parse text, PDFs, screenshots,<br/>URLs, YAML → unified.md] --> P2
     P2[P2 RESEARCH<br/>sub-agent reads KB + web<br/>→ research-brief.md] --> P3
     P3[P3 DECOMPOSE<br/>sub-agent emits ticket-candidates.json<br/>with ACs, scope, DoD, dependencies] --> P4
-    P4{P4 VALIDATE<br/>HQC + DAG + REG-1..6 +<br/>migration-serial + measurable-AC}
+    P4{P4 STRUCTURAL-VALIDATE<br/>HQC + DAG + REG-1..6 +<br/>migration-serial + measurable-AC}
 
     P4 -->|blocking failure| Halt([halt with<br/>specific halt-code])
-    P4 -->|all pass| P5
+    P4 -->|all pass| P45
+
+    P45{P4.5 STANDARDS-BRIDGE<br/>shared validator — same one run-bolt calls<br/>1. structural HQC re-run<br/>2. app-type AC compliance HIPAA/PCI/FDA<br/>3. KG-aware scope correctness ≥ 0.7 coverage<br/>4. mutation- and coverage-feasibility<br/>5. mandatory-test-type policy<br/>6. Dafny-invariant exposure<br/>7. reopen-c self-audit<br/>8. HIPAA-reviewer pre-flight HIPAA mode}
+
+    P45 -->|blocking failure| HaltSB([halt with<br/>same halt-code run-bolt would raise<br/>e.g. ac_violates_app_type_standard])
+    P45 -->|all pass| P5
 
     P5[P5 DIFF<br/>generate human-readable diff<br/>plans/...-diff.md] --> Approve{Human types<br/>'approve'?}
 
@@ -101,12 +107,16 @@ flowchart TD
     P6[P6 WRITE<br/>idempotent ticket creation via<br/>label-keyed search; never modifies<br/>In-Progress or Done tickets] --> Out[/Tickets in ticket tool<br/>+ scaffolding files committed/]
     Out --> Done([epic ready for /run-bolt])
 
+    style P45 fill:#e8e0ff,stroke:#5040a0,stroke-width:2px
     style P5 fill:#fff8e0,stroke:#a06000
     style Approve fill:#fff8e0,stroke:#a06000,stroke-width:2px
     style Halt fill:#ffe0e0,stroke:#a03030
+    style HaltSB fill:#ffe0e0,stroke:#a03030
     style Cancel fill:#ffe0e0,stroke:#a03030
     style Done fill:#e8ffe8,stroke:#308030,stroke-width:2px
 ```
+
+> **Why P4.5 matters:** make-bolt and run-bolt share a single validator (`bolt_shared/standards_bridge.py`). Run-bolt calls the same function at P0.5 EPIC-INIT and on every sub-agent preflight. A ticket that passes P4.5 cannot fail run-bolt's structural / scope / app-type / policy / Dafny-invariant gates at runtime — those are pre-cleared. Master plan §29 is the spec.
 
 ---
 

@@ -1316,4 +1316,176 @@ Files **created by future-Claude** during build (gated by the kickoff prompt):
 
 ---
 
+## 29. Standards-Coherence Bridge — make-bolt MUST validate against run-bolt's standards
+
+### 29.1 The gap this section closes
+
+The original §15 stated that make-bolt's P4 VALIDATE phase enforces structural HQC: DAG acyclic, ACs measurable, file_scope_claims non-empty, ≤4h, REG-1..6 present, no service-root paths. Those are **necessary but insufficient**. Run-bolt enforces a much wider set of *semantic* standards at runtime that make-bolt's structural validation does not catch:
+
+| Run-bolt standard (where enforced) | Make-bolt structural validation alone? | Gap closed by §29 |
+|---|---|---|
+| HIPAA AC-compliance (e.g. AC says "log SSN to console" — measurable but illegal) | ✗ — passes vague-phrase regex | ✓ |
+| KG-aware scope correctness (file_scope_claims actually contain the symbols needed for ACs) | ✗ — only checks paths exist | ✓ |
+| Mutation-feasibility (config-only or docs-only ticket cannot hit mutation-score floor) | ✗ | ✓ |
+| Coverage-feasibility (same) | ✗ | ✓ |
+| Mandatory-test-type policy (`policy.mandatory_test_types[*].applies_to_paths_glob`) | ✗ | ✓ |
+| App-type-specific gates (PHI-in-logs scanner, audit-log emitter, encryption-in-transit assertion) | ✗ | ✓ |
+| Dafny-invariant exposure (ticket touches PHI redaction / audit-log writes / retention purge / encryption-at-rest / session-token expiry) | ✗ | ✓ |
+| Reopen-(c) eligibility (ticket without required test type would auto-reopen on its own merge) | ✗ | ✓ |
+| Cross-family judge dissent risk (AC ambiguity high enough to predict 'request_changes') | ✗ — runtime only | partially: AC clarity heuristic |
+| Calibrated rejection threshold (per ticket-class) | ✗ — runtime only | partially: ticket-class tagging |
+| Adoption-grading thresholds (post-merge retroactive grading would fail) | ✗ — runtime only | ✓ |
+| KG confidence threshold per consumer (a ticket whose scope is dominated by KG edges below threshold is high-risk) | ✗ | ✓ |
+
+**Without §29, make-bolt and run-bolt are coupled by intent only, not by contract.** A ticket can pass make-bolt and still halt run-bolt at P0 / P3 / AI-review / mutation. §29 closes this by adding a **single shared validator** that both skills call.
+
+### 29.2 The shared validator — `bolt_shared/standards_bridge.py`
+
+```python
+# bolt_shared/standards_bridge.py — single source of truth for cross-skill standards
+from typing import Protocol
+from dataclasses import dataclass
+
+@dataclass
+class StandardsValidationResult:
+    blocking_failures: list[StandardViolation]   # halt make-bolt or run-bolt
+    warnings: list[StandardViolation]            # surface to user, non-blocking
+    auto_fixes: list[AutoFix]                    # auto-applied in make-bolt
+    risk_score: float                            # 0.0–1.0; informs run-bolt calibrated threshold
+    ticket_class: str                            # backend_api | data_loader | migration | frontend | docs | mixed
+    mutation_required: bool                      # false for docs-only / config-only
+    coverage_required: bool                      # false for docs-only
+    hipaa_touch_predicted: bool                  # true if ACs reference PHI / auth / billing scope
+    dafny_invariants_potentially_affected: list[str]
+    mandatory_test_types_required: list[str]
+    kg_scope_coverage: float                     # fraction of AC-implied-symbols covered at calibrated_confidence ≥ 0.85
+    blast_radius_callers: int                    # max KG callers across symbols implied by ACs
+
+def validate_ticket_against_run_bolt_standards(
+    ticket: TicketCandidate,
+    kg: KnowledgeGraph,
+    policy: Policy,
+    app_type: AppType,
+    *,
+    run_hipaa_pre_review: bool = True,
+    run_kg_scope_check: bool = True,
+    run_mutation_feasibility_check: bool = True,
+) -> StandardsValidationResult:
+    """
+    Called by:
+      - make-bolt P4.5 STANDARDS-BRIDGE (NEW phase)
+      - run-bolt P0.5 EPIC-INIT (re-validate all tickets)
+      - run-bolt P0.75 ADOPT (retroactive grade Done tickets)
+      - run-bolt sub-agent preflight (per-ticket re-validate)
+
+    Deterministic except for the optional HIPAA pre-review sub-agent
+    dispatch, which is logged with prompt SHA for replay.
+    """
+```
+
+### 29.3 The eight checks the bridge runs
+
+For each ticket candidate, in order. Any blocking_failure halts immediately.
+
+1. **Structural HQC re-run** — same checks make-bolt P4 does today; kept here for the run-bolt-side callers (they can't assume make-bolt validated).
+
+2. **App-type AC compliance.** In HIPAA mode (or PCI / FERPA / FDA-SaMD per the §10 detector), each AC is matched against a domain-specific anti-pattern regex AND scanned by an LLM-based reviewer (best-of-1 Claude Haiku for cost) against the §164.312 / ASVS L2 / IEC-62304 checklist. ACs that read "log PHI", "store SSN plaintext", "skip encryption for performance", "disable audit log for testing" → blocking_failure with category `ac_violates_app_type_standard`. Forbidden-AC corpus is committed at `.claude/skills/bolt_shared/standards_bridge_forbidden_ac_examples.md` and is part of the prompt SHA pin.
+
+3. **KG-aware scope correctness.** Parse each AC for symbol-name candidates (NLP heuristic + LLM extraction). For each candidate, query the KG: does any symbol matching the candidate exist in any file in `file_scope_claims` at `calibrated_confidence ≥ 0.85`? If `kg_scope_coverage < 0.7` → blocking_failure `scope_claims_dont_match_acs` with the unmatched symbols listed.
+
+4. **Mutation- and coverage-feasibility.** Inspect `file_scope_claims` extensions and inferred file types. If 100% are `*.md`, `*.yaml`, `*.json`, `*.csproj`, `appsettings.json` → set `mutation_required=False` and `coverage_required=False`. Otherwise compute the .cs / .ts / .tsx file count and require the standard floors. Tickets that mix code + config get the floors only on the code subset. **A ticket asking for "update config to enable feature X" no longer halts at run-bolt's mutation gate** — it carries `mutation_required=False` from creation time.
+
+5. **Mandatory-test-type policy.** Read `policy.mandatory_test_types[*]`. For each `applies_to_paths_glob` that intersects this ticket's `file_scope_claims`, ensure the AC list includes a measurable AC referencing the required test type (e.g., REG-4 mutation → AC must include "Stryker mutation score ≥ 0.80 verified via `dotnet stryker`"). Missing → blocking_failure `mandatory_test_type_not_in_acs`.
+
+6. **Dafny-invariant exposure.** Static keyword + KG-symbol heuristic: does the ticket touch a function/class tagged with the `phi_redaction` / `audit_log` / `retention_purge` / `encryption_at_rest` / `session_token_expiry` invariant? If yes, the ACs MUST include "Dafny verification of invariant <name> still holds post-change" or the ticket is blocked unless an ADR at `docs/adr/<date>-skip-dafny-<invariant>.md` justifies the skip.
+
+7. **Reopen-(c) self-audit.** Compute `mandatory_test_types_required`. If any required test type is not in the AC list AND the ticket's `merged_at` projection (= now + estimate_hours) is after the policy's `effective_date` for that test type, the ticket would auto-reopen on its own merge — blocking_failure `would_self_reopen`.
+
+8. **HIPAA-reviewer pre-flight (HIPAA mode only).** Dispatch a single HIPAA-reviewer sub-agent (model: Claude Opus 4.7, `effort: medium`, capped at 30k tokens) with the ticket's title + summary + ACs + file_scope_claims. The reviewer returns a verdict in the §11.1 schema. `verdict: "block"` → blocking_failure `hipaa_reviewer_pre_block`. `verdict: "request_changes"` → warning. `verdict: "approve"` → pass. **This catches PHI-handling violations the regex misses.** The dispatch is cached by `(ticket_canonical_hash, prompt_sha, hipaa_reviewer_version)` so reruns are free.
+
+### 29.4 Where the bridge plugs in
+
+```
+make-bolt phase order (updated):
+  P1 INGEST → P2 RESEARCH → P3 DECOMPOSE → P4 STRUCTURAL-VALIDATE
+  → P4.5 STANDARDS-BRIDGE (NEW)   ← validate_ticket_against_run_bolt_standards()
+  → P5 DIFF → P6 WRITE
+
+run-bolt phase order (updated):
+  P-1 → P0 → P0.25 → P0.5 EPIC-INIT
+    └─ inside P0.5 step "validate ticket sections":
+       call validate_ticket_against_run_bolt_standards() per ticket
+       any blocking_failure → halt P0.5 with the same halt code make-bolt
+       would have raised. Forces parity.
+  → P0.75 ADOPT → wave loop → P4 → P5
+
+run-bolt sub-agent preflight (every ticket, every wave):
+  call validate_ticket_against_run_bolt_standards() with current KG
+  → catches policy changes that happened AFTER make-bolt ran
+  → catches KG drift that invalidates scope claims
+```
+
+### 29.5 Policy is the single source of truth
+
+`policy.yaml` lives at `docs/run-bolt/policy.yaml` and is **read by both skills**. Make-bolt does not maintain its own thresholds. The bridge reads:
+
+- `policy.gates.*` — coverage, mutation, ASVS level, accessibility floors
+- `policy.mandatory_test_types[*]` — drives reopen-(c) and the bridge's check #5
+- `policy.dafny_invariants[*]` — list of invariants and the keyword/symbol heuristic to detect exposure
+- `policy.app_type_overrides` — per-app-type gate tightenings (HIPAA → ASVS L2; FDA-SaMD → ASVS L3)
+- `policy.hipaa_reviewer_pre_flight.enabled` — toggle for §29.3 #8 (default true in HIPAA mode)
+- `policy.standards_bridge.kg_scope_coverage_floor` — default 0.7
+- `policy.standards_bridge.calibrated_confidence_floor` — default 0.85
+
+Any change to `policy.yaml` bumps `policy_version` per Hard Invariant #10. Make-bolt's diff (P5) shows which standards-bridge checks were tightened/relaxed since the last write.
+
+### 29.6 The forbidden-AC corpus
+
+`.claude/skills/bolt_shared/standards_bridge_forbidden_ac_examples.md` ships in the package. It enumerates ~50 AC anti-patterns per app-type with regex AND example, e.g.:
+
+```yaml
+# HIPAA forbidden ACs (excerpt)
+- regex: "log.*(SSN|MRN|patient name|DOB|date of birth)"
+  example: "Log patient SSN to console for debugging"
+  rule: "164.312(b) — audit controls; never log PHI to non-audit sinks"
+  category: ac_violates_app_type_standard
+
+- regex: "(skip|disable|bypass).*(encryption|TLS)"
+  example: "Skip TLS for internal service-to-service calls"
+  rule: "164.312(e)(1) — transmission security"
+  category: ac_violates_app_type_standard
+
+- regex: "store.*plain.*(text|password|token)"
+  example: "Store API token in plain text in config"
+  rule: "164.312(a)(2)(iv) — encryption and decryption"
+  category: ac_violates_app_type_standard
+
+# add ASVS L2 (PCI), FERPA, FDA-SaMD, AI-product analogues
+```
+
+Future-Claude expands the corpus during M0 from research-file Appendix A. Updates go through the §9 self-improvement two-tier (regex tightening = L0 auto-apply; new app-type added = L2 PR).
+
+### 29.7 Sign-off update (replaces §27.5)
+
+Future-Claude **may not** mark M5 done without all of §25.4 + §27.5 PLUS:
+
+- §29.2 `bolt_shared/standards_bridge.py` implemented
+- All eight checks in §29.3 unit-tested with at least 3 positive + 3 negative cases each
+- Forbidden-AC corpus seeded with ≥ 30 entries per shipped app-type
+- make-bolt P4.5 STANDARDS-BRIDGE phase wired
+- run-bolt P0.5 EPIC-INIT calls the bridge per ticket
+- run-bolt sub-agent preflight calls the bridge per ticket
+- Integration test: a deliberately non-compliant ticket (e.g. AC says "log SSN to console") halts at make-bolt P4.5 with `ac_violates_app_type_standard` and never reaches run-bolt
+- Integration test: a structurally-fine but scope-claims-mismatching ticket halts with `scope_claims_dont_match_acs`
+- Integration test: a docs-only ticket carries `mutation_required=False` and run-bolt's mutation gate respects it (no false halt)
+
+### 29.8 What this does NOT promise
+
+- The HIPAA-reviewer pre-flight is one cheap LLM pass. It catches obvious PHI-handling violations, not subtle ones. Subtle ones still surface at run-bolt's full P3.5 AI-review (which uses Opus, not Haiku).
+- The KG-scope-coverage check uses calibrated confidence; it inherits the §26 ceiling (~94-96%). A ticket can pass with `kg_scope_coverage = 0.85` and still touch a symbol the KG missed.
+- The bridge does NOT predict cross-family AI-judge dissent or calibrated-rejection-threshold misses. Those are runtime measurements; make-bolt cannot foresee them.
+- Adding the bridge does NOT remove run-bolt's runtime gates — it makes them more rarely fire, which is the whole point.
+
+---
+
 **End of master plan.**
